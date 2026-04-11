@@ -9,7 +9,7 @@ export default function Privacy() {
             fontSize: "0.72rem",
             fontWeight: 700,
             letterSpacing: "0.18em",
-            textTransform: "uppercase",
+            textTransform: "uppercase" as const,
             color: "#DC2626",
             marginBottom: "0.85rem",
           }}>Legal</p>
@@ -32,69 +32,72 @@ export default function Privacy() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "2.25rem" }}>
 
-          <Section>
+          <Section title="Introduction">
             <Body>
-              This Privacy Policy explains how Ryoblox ("the bot", "we", "our") collects, uses, and stores data when you invite and use the bot in your Discord server. By adding Ryoblox to your server you agree to these terms.
+              This Privacy Policy describes how Ryoblox ("we", "us", or "our") collects, uses, and handles your information when you use the Ryoblox Discord bot (the "Bot"). Ryoblox is a Roblox game analytics bot that tracks player join activity and generates statistics. By using the Bot, you agree to the collection and use of information in accordance with this policy.
             </Body>
           </Section>
 
-          <Section title="1. What data we collect">
-            <Body>Ryoblox collects only the minimum data required to operate its analytics features:</Body>
+          <Section title="Information We Collect">
+            <Body>Ryoblox collects a limited set of data necessary to provide analytics functionality:</Body>
             <List items={[
-              "Roblox usernames received through webhook messages in the configured channel",
-              "Timestamps of when each join event was received",
-              "Discord channel IDs used to identify the webhook target",
+              "Roblox usernames — collected from webhook messages sent to a designated Discord channel when players join your game",
+              "Join timestamps — the date and time each player join event is recorded",
+              "Discord channel ID — the channel configured to receive webhook data",
             ]} />
             <Body>
-              We do not collect Discord user IDs, personal messages, server member lists, or any data beyond what is listed above. All data comes from your own Roblox game webhooks — nothing is harvested passively.
+              The Bot does not collect Discord messages, personal information, IP addresses, or any data outside of the configured webhook channel.
             </Body>
           </Section>
 
-          <Section title="2. How data is stored">
+          <Section title="How Data Is Collected">
             <Body>
-              All data collected by Ryoblox is stored in local JSON files on the machine running the bot. This is self-hosted software — meaning you run it yourself. We have no access to your data, your server, or your logs at any point.
+              Data is collected automatically when a Roblox game sends a webhook message to a designated Discord channel. The Bot parses messages matching the format <Code>New player joined: [username]</Code> and stores the username along with a timestamp in a local SQLite database.
             </Body>
+          </Section>
+
+          <Section title="How We Use Your Information">
+            <Body>Collected data is used exclusively to:</Body>
             <List items={[
-              <>Player join records are saved in <Code>analytics.json</Code></>,
-              <>Configuration (channel ID, etc.) is saved in <Code>config.json</Code></>,
-              "Data is never transmitted to a third party",
-            ]} />
-          </Section>
-
-          <Section title="3. How data is used">
-            <Body>
-              Collected data is used solely to generate statistical charts and summaries when you run slash commands. The bot processes data locally and sends the resulting charts to your Discord channel. No data is used for advertising, profiling, or any commercial purpose.
-            </Body>
-          </Section>
-
-          <Section title="4. Data retention">
-            <Body>
-              Since you run this bot yourself, you control retention entirely. You can delete or modify the JSON files at any time. There is no automatic retention limit — data stays until you remove it.
-            </Body>
-          </Section>
-
-          <Section title="5. Third-party services">
-            <List items={[
-              <><Strong>Discord API</Strong> — to receive webhook messages and send command responses. Discord's own privacy policy governs all interactions with their platform.</>,
-              <><Strong>Matplotlib</Strong> — a local Python library used to render charts. No data leaves your machine during chart generation.</>,
+              "Generate player join statistics and charts via slash commands",
+              "Show top players, individual player history, and overall game traffic",
+              "Provide game analytics to the server owner",
             ]} />
           </Section>
 
-          <Section title="6. Children's privacy">
+          <Section title="Data Storage & Security">
             <Body>
-              Ryoblox is not directed at children under 13. We do not knowingly collect any personal data from minors.
+              All data is stored locally in an SQLite database file on the machine running the Bot. Data is not transmitted to any external servers, cloud services, or third parties. The database contains only Roblox usernames and join timestamps — no sensitive or personally identifiable information is stored.
             </Body>
           </Section>
 
-          <Section title="7. Changes to this policy">
+          <Section title="Data Retention & Deletion">
             <Body>
-              We may update this Privacy Policy from time to time. Changes will be reflected by updating the date at the top of this page. Continued use of the bot after changes constitutes acceptance.
+              Data is retained as long as the Bot is operational and the database file exists. Server owners can delete all collected data at any time by removing or clearing the SQLite database file. Removing the Bot from a server stops all future data collection immediately.
             </Body>
           </Section>
 
-          <Section title="8. Contact">
+          <Section title="Third-Party Services">
             <Body>
-              For any questions or concerns about this policy, reach out via Discord to <Strong>@neporrex_</Strong>.
+              The Bot operates within the Discord platform and is subject to <A href="https://discord.com/privacy">Discord's Privacy Policy</A>. We do not share, sell, or transmit your data to any other third party.
+            </Body>
+          </Section>
+
+          <Section title="Children's Privacy">
+            <Body>
+              The Bot is not intended for users under the age of 13 (or the minimum age required by Discord in your country). We do not knowingly collect information from children under this age.
+            </Body>
+          </Section>
+
+          <Section title="Changes to This Policy">
+            <Body>
+              We may update this Privacy Policy from time to time. Any changes will be reflected on this page with an updated revision date. Continued use of the Bot after changes constitutes acceptance of the new policy.
+            </Body>
+          </Section>
+
+          <Section title="Contact">
+            <Body>
+              If you have questions about this Privacy Policy, reach out to <Strong>@neporrex_</Strong> on Discord.
             </Body>
           </Section>
 
@@ -174,4 +177,15 @@ function Code({ children }: { children: React.ReactNode }) {
 
 function Strong({ children }: { children: React.ReactNode }) {
   return <span style={{ color: "#d1d5db", fontWeight: 600 }}>{children}</span>;
+}
+
+function A({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ color: "#DC2626", textDecoration: "underline", textDecorationColor: "rgba(220,38,38,0.35)" }}
+    >{children}</a>
+  );
 }

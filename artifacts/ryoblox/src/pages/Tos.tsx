@@ -9,7 +9,7 @@ export default function Tos() {
             fontSize: "0.72rem",
             fontWeight: 700,
             letterSpacing: "0.18em",
-            textTransform: "uppercase",
+            textTransform: "uppercase" as const,
             color: "#DC2626",
             marginBottom: "0.85rem",
           }}>Legal</p>
@@ -32,91 +32,79 @@ export default function Tos() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "2.25rem" }}>
 
-          <Section>
+          <Section title="Acceptance of Terms">
             <Body>
-              These Terms of Service ("Terms") govern your use of the Ryoblox Discord bot. By adding Ryoblox to your server or using any of its commands, you agree to be bound by these Terms.
+              By adding Ryoblox (the "Bot") to your Discord server or using any of its features, you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, please remove the Bot from your server and discontinue use.
             </Body>
           </Section>
 
-          <Section title="1. About Ryoblox">
+          <Section title="Description of Service">
             <Body>
-              Ryoblox is a Discord bot that helps Roblox game developers track player analytics inside Discord. The bot listens to webhook messages from your Roblox game and stores player join data in local JSON files. It provides three slash commands:
+              Ryoblox is a Roblox game analytics Discord bot. It monitors a designated channel for webhook messages from your Roblox game, logs player join events, and provides analytics through the following slash commands:
             </Body>
             <List items={[
-              <><Strong>/stats_top</Strong> — bar chart of the top 10 players by join count</>,
-              <><Strong>/stats_player [username]</Strong> — detailed join history for a specific Roblox player</>,
-              <><Strong>/stats_all</Strong> — overall game traffic: total joins, unique players, and daily trends</>,
+              <><Strong>/stats_top</Strong> — Bar chart of the top 10 most frequent players</>,
+              <><Strong>/stats_player [username]</Strong> — Individual player stats and join history chart</>,
+              <><Strong>/stats_all</Strong> — Overall game traffic stats and chart</>,
+              <><Strong>/stats_today</Strong> — Today's joins and active players</>,
+              <><Strong>/stats_week</Strong> — Last 7 days of game traffic</>,
+              <><Strong>/leaderboard</Strong> — Ranked leaderboard embed (no chart)</>,
             ]} />
+            <Body>The Bot is provided "as is" and "as available" without any warranties of any kind.</Body>
+          </Section>
+
+          <Section title="How It Works">
             <Body>
-              All analytics data is stored locally in JSON format — <Code>analytics.json</Code> for player join records and <Code>config.json</Code> for configuration. No database is required.
+              The Bot listens to a specific Discord channel for webhook messages from your Roblox game. When a message matching the format <Code>New player joined: [username]</Code> is detected, the Bot records the player's Roblox username and a timestamp into a local SQLite database. This data is used to generate charts and statistics on demand.
             </Body>
           </Section>
 
-          <Section title="2. Eligibility">
-            <Body>
-              You must be at least 13 years of age to use Ryoblox, in accordance with Discord's Terms of Service. By using Ryoblox you confirm you meet this requirement. Server administrators are responsible for ensuring compliance within their server.
-            </Body>
-          </Section>
-
-          <Section title="3. Acceptable use">
-            <Body>You agree not to use Ryoblox to:</Body>
+          <Section title="User Responsibilities">
+            <Body>By using the Bot, you agree to:</Body>
             <List items={[
-              "Collect or process data in violation of any applicable law or regulation",
-              "Harass, threaten, or harm any individual or group",
-              "Spam, abuse, or overload the bot's functionality",
-              "Attempt to reverse-engineer, modify, or exploit the bot in unauthorized ways",
-              "Use the bot for purposes other than Roblox game analytics",
-            ]} />
-          </Section>
-
-          <Section title="4. Self-hosted software">
-            <Body>Ryoblox is provided as self-hosted software. This means you run it on your own machine. Because of this:</Body>
-            <List items={[
-              "You are responsible for the security and maintenance of your bot instance",
-              "You are responsible for safeguarding any data stored in your local JSON files",
-              "The developer (@neporrex_) has no access to your bot instance, your data, or your server",
+              "Comply with Discord's Terms of Service and Community Guidelines",
+              "Comply with Roblox's Terms of Use",
+              "Not use the Bot for any illegal or unauthorized purpose",
+              "Not attempt to exploit, reverse engineer, or disrupt the Bot's functionality",
+              "Not abuse the Bot's commands (e.g., spamming slash commands)",
+              "Ensure the webhook channel is properly configured for your Roblox game",
+              "Take responsibility for all activity on your server related to the Bot",
             ]} />
           </Section>
 
-          <Section title="5. Discord compliance">
+          <Section title="Data & Storage">
             <Body>
-              Your use of Ryoblox must comply with Discord's{" "}
-              <a href="https://discord.com/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#DC2626", textDecoration: "underline", textDecorationColor: "rgba(220,38,38,0.3)" }}>Terms of Service</a>
-              {" "}and{" "}
-              <a href="https://discord.com/guidelines" target="_blank" rel="noopener noreferrer" style={{ color: "#DC2626", textDecoration: "underline", textDecorationColor: "rgba(220,38,38,0.3)" }}>Community Guidelines</a>
-              {" "}at all times. Ryoblox is an independent project and is not affiliated with or endorsed by Discord Inc.
+              The Bot stores data locally in an SQLite database. Only Roblox usernames and join timestamps are stored. No Discord messages, personal information, or sensitive data is collected. For full details, please review our <A href="/privacy">Privacy Policy</A>.
             </Body>
           </Section>
 
-          <Section title="6. Roblox compliance">
+          <Section title="Availability">
             <Body>
-              Your use of Ryoblox must also comply with the{" "}
-              <a href="https://en.help.roblox.com/hc/en-us/articles/115004647846" target="_blank" rel="noopener noreferrer" style={{ color: "#DC2626", textDecoration: "underline", textDecorationColor: "rgba(220,38,38,0.3)" }}>Roblox Terms of Use</a>.
-              {" "}Ryoblox is not affiliated with or endorsed by Roblox Corporation.
+              We strive to keep the Bot running smoothly, but we do not guarantee 100% uptime. The Bot may be temporarily unavailable due to maintenance, updates, or unforeseen issues. We are not liable for any damages resulting from downtime or data loss.
             </Body>
           </Section>
 
-          <Section title="7. Disclaimer of warranties">
+          <Section title="Limitation of Liability">
             <Body>
-              Ryoblox is provided "as is" without warranty of any kind, express or implied. We make no guarantees about uptime, accuracy of analytics data, or fitness for any particular purpose. Your use of the bot is entirely at your own risk.
+              To the maximum extent permitted by law, Ryoblox and its developer(s) shall not be held liable for any indirect, incidental, special, consequential, or punitive damages arising out of or related to your use of the Bot, including but not limited to loss of data, inaccurate analytics, or service interruptions.
             </Body>
           </Section>
 
-          <Section title="8. Limitation of liability">
+          <Section title="Modifications">
             <Body>
-              To the fullest extent permitted by applicable law, the developer of Ryoblox shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of, or inability to use, the bot.
+              We reserve the right to modify the Bot's features, commands, functionality, or these Terms at any time without prior notice. Continued use of the Bot after modifications constitutes your acceptance of the updated Terms.
             </Body>
           </Section>
 
-          <Section title="9. Changes to these Terms">
+          <Section title="Termination">
             <Body>
-              We reserve the right to update these Terms at any time. Updates will be reflected by the date at the top of this page. Continued use of Ryoblox after changes constitutes your acceptance of the new Terms.
+              We reserve the right to restrict or terminate your access to the Bot at any time, for any reason, including but not limited to violations of these Terms. You may stop using the Bot at any time by removing it from your server.
             </Body>
           </Section>
 
-          <Section title="10. Contact">
+          <Section title="Contact">
             <Body>
-              For questions about these Terms, reach out via Discord to <Strong>@neporrex_</Strong>.
+              For any questions regarding these Terms, reach out to <Strong>@neporrex_</Strong> on Discord.
             </Body>
           </Section>
 
@@ -196,4 +184,13 @@ function Code({ children }: { children: React.ReactNode }) {
 
 function Strong({ children }: { children: React.ReactNode }) {
   return <span style={{ color: "#d1d5db", fontWeight: 600 }}>{children}</span>;
+}
+
+function A({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      style={{ color: "#DC2626", textDecoration: "underline", textDecorationColor: "rgba(220,38,38,0.35)" }}
+    >{children}</a>
+  );
 }
