@@ -19,7 +19,7 @@ export default function Navbar() {
           <Link href="/" className={`nav-link${location === "/" ? " active" : ""}`}>
             Home
           </Link>
-          <Link href="/instructions" className={`nav-link${location === "/instructions" ? " active" : ""}`}>
+          <Link href="/setup" className={`nav-link${location === "/setup" ? " active" : ""}`}>
             Setup
           </Link>
           <Link href="/privacy" className={`nav-link${location === "/privacy" ? " active" : ""}`}>
