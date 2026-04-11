@@ -9,66 +9,148 @@ local joinTimes = {}
 
 -- Convert seconds to a readable time format
 local function formatTime(seconds)
-	local h = math.floor(seconds / 3600)
-	local m = math.floor((seconds % 3600) / 60)
-	local s = math.floor(seconds % 60)
-	if h > 0 then
-		return string.format("%dh %dm %ds", h, m, s)
-	elseif m > 0 then
-		return string.format("%dm %ds", m, s)
-	else
-		return string.format("%ds", s)
-	end
+    local h = math.floor(seconds / 3600)
+    local m = math.floor((seconds % 3600) / 60)
+    local s = math.floor(seconds % 60)
+    if h > 0 then
+        return string.format("%dh %dm %ds", h, m, s)
+    elseif m > 0 then
+        return string.format("%dm %ds", m, s)
+    else
+        return string.format("%ds", s)
+    end
 end
 
 -- Send a message when a player joins
 local function sendJoin(player)
-	local data = {
-		["content"] = "New player joined: " .. player.Name
-	}
-	local jsonData = HttpService:JSONEncode(data)
-	pcall(function()
-		HttpService:PostAsync(Webhook_url, jsonData, Enum.HttpContentType.ApplicationJson)
-	end)
+    local data = {
+        ["content"] = "New player joined: " .. player.Name
+    }
+    local jsonData = HttpService:JSONEncode(data)
+    pcall(function()
+        HttpService:PostAsync(Webhook_url, jsonData, Enum.HttpContentType.ApplicationJson)
+    end)
 end
 
 -- Send a message when a player leaves, including playtime
 local function sendLeave(player)
-	local joinTime = joinTimes[player.UserId]
-	local playtime = "unknown"
-	if joinTime then
-		playtime = formatTime(os.time() - joinTime)
-		joinTimes[player.UserId] = nil
-	end
-	local data = {
-		["content"] = "Player left: " .. player.Name .. " | Playtime: " .. playtime
-	}
-	local jsonData = HttpService:JSONEncode(data)
-	pcall(function()
-		HttpService:PostAsync(Webhook_url, jsonData, Enum.HttpContentType.ApplicationJson)
-	end)
+    local joinTime = joinTimes[player.UserId]
+    local playtime = "unknown"
+    if joinTime then
+        playtime = formatTime(os.time() - joinTime)
+        joinTimes[player.UserId] = nil
+    end
+    local data = {
+        ["content"] = "Player left: " .. player.Name .. " | Playtime: " .. playtime
+    }
+    local jsonData = HttpService:JSONEncode(data)
+    pcall(function()
+        HttpService:PostAsync(Webhook_url, jsonData, Enum.HttpContentType.ApplicationJson)
+    end)
 end
 
 Players.PlayerAdded:Connect(function(player)
-	joinTimes[player.UserId] = os.time()
-	sendJoin(player)
+    joinTimes[player.UserId] = os.time()
+    sendJoin(player)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
-	sendLeave(player)
+    sendLeave(player)
 end)`;
 
-const COMMANDS = [
-  { name: "/set-channel", desc: "Set the channel Ryoblox listens to for join events. Requires Manage Channels permission." },
-  { name: "/stats_top", desc: "Bar chart of your top 10 most frequent players by join count." },
-  { name: "/stats_player [username]", desc: "Individual join history and chart for a specific Roblox player." },
-  { name: "/stats_all", desc: "Overall game traffic — total joins, unique players, and daily trend." },
-  { name: "/stats_today", desc: "Today's join count, unique players, and top 5 players." },
-  { name: "/stats_week", desc: "Last 7 days of game traffic as a line chart." },
-  { name: "/leaderboard", desc: "Ranked top 15 players as a Discord embed with medals." },
-  { name: "/ping", desc: "Check if the bot is online and view latency." },
-  { name: "/help", desc: "List all available Ryoblox commands." },
-];
+const KEYWORDS = ["local", "function", "end", "if", "then", "elseif", "else", "return", "and", "or", "not", "nil", "true", "false", "do", "while", "for", "in", "repeat", "until", "break"];
+
+function highlight(code: string): React.ReactNode[] {
+  const lines = code.split("\n");
+  return lines.map((line, lineIndex) => {
+    const nodes: React.ReactNode[] = [];
+    let i = 0;
+
+    while (i < line.length) {
+      // Comment
+      if (line[i] === "-" && line[i + 1] === "-") {
+        nodes.push(
+          <span key={i} style={{ color: "#6A9955" }}>{line.slice(i)}</span>
+        );
+        i = line.length;
+        continue;
+      }
+
+      // String
+      if (line[i] === '"' || line[i] === "'") {
+        const quote = line[i];
+        let j = i + 1;
+        while (j < line.length && line[j] !== quote) j++;
+        nodes.push(
+          <span key={i} style={{ color: "#CE9178" }}>{line.slice(i, j + 1)}</span>
+        );
+        i = j + 1;
+        continue;
+      }
+
+      // Number
+      if (/[0-9]/.test(line[i])) {
+        let j = i;
+        while (j < line.length && /[0-9.]/.test(line[j])) j++;
+        nodes.push(
+          <span key={i} style={{ color: "#B5CEA8" }}>{line.slice(i, j)}</span>
+        );
+        i = j;
+        continue;
+      }
+
+      // Keyword or identifier
+      if (/[a-zA-Z_]/.test(line[i])) {
+        let j = i;
+        while (j < line.length && /[a-zA-Z0-9_]/.test(line[j])) j++;
+        const word = line.slice(i, j);
+
+        // Peek ahead for function call
+        const rest = line.slice(j).trimStart();
+        const isCall = rest.startsWith("(") || rest.startsWith(":");
+
+        if (KEYWORDS.includes(word)) {
+          nodes.push(
+            <span key={i} style={{ color: "#569CD6" }}>{word}</span>
+          );
+        } else if (["game", "math", "string", "os", "Enum", "HttpService", "Players"].includes(word)) {
+          nodes.push(
+            <span key={i} style={{ color: "#4EC9B0" }}>{word}</span>
+          );
+        } else if (isCall) {
+          nodes.push(
+            <span key={i} style={{ color: "#DCDCAA" }}>{word}</span>
+          );
+        } else {
+          nodes.push(
+            <span key={i} style={{ color: "#9CDCFE" }}>{word}</span>
+          );
+        }
+        i = j;
+        continue;
+      }
+
+      // Operator
+      if (/[+\-*/%^#&|~<>=]/.test(line[i])) {
+        nodes.push(
+          <span key={i} style={{ color: "#D4D4D4" }}>{line[i]}</span>
+        );
+        i++;
+        continue;
+      }
+
+      // Default
+      nodes.push(<span key={i} style={{ color: "#D4D4D4" }}>{line[i]}</span>);
+      i++;
+    }
+
+    return (
+      <div key={lineIndex} style={{ minHeight: "1.75em" }}>
+        {nodes}
+      </div>
+    );
+  });
+}
 
 export default function Instructions() {
   const [copied, setCopied] = useState(false);
@@ -124,53 +206,35 @@ export default function Instructions() {
             In your Discord server, go to the channel where you want to receive join events. Open <strong style={{ color: "#e5e5e5" }}>Channel Settings → Integrations → Webhooks → New Webhook</strong>. Copy the webhook URL — you'll paste it into the Lua script shortly.
           </Step>
 
-          <Step n={3} title="Set your stats channel">
-            In your Discord server, run the command <Code>/set-channel</Code> and select the same channel you created the webhook in. This tells Ryoblox which channel to watch for player joins.
-          </Step>
-
-          <Step n={4} title="Add the Lua script to your Roblox game">
-            In <strong style={{ color: "#e5e5e5" }}>Roblox Studio</strong>, open your game and go to <strong style={{ color: "#e5e5e5" }}>ServerScriptService</strong>. Create a new <strong style={{ color: "#e5e5e5" }}>Script</strong> (not LocalScript), paste the code below, and fill in your webhook URL from Step 2.
-          </Step>
-
-          <Step n={5} title="Enable HTTP requests in Studio">
-            In Roblox Studio go to <strong style={{ color: "#e5e5e5" }}>Home → Game Settings → Security</strong> and toggle on <strong style={{ color: "#e5e5e5" }}>Allow HTTP Requests</strong>. Without this the webhook calls will be silently blocked.
-          </Step>
-
-          <Step n={6} title="Publish and test">
-            Publish your game, then join it from the Roblox client. Within a few seconds you should see a message appear in your webhook channel. Then run <Code>/stats_top</Code> in Discord — your name should appear on the chart.
+          <Step n={3} title="Paste the script into Roblox Studio">
+            Open Roblox Studio and insert a <strong style={{ color: "#e5e5e5" }}>Script</strong> inside <strong style={{ color: "#e5e5e5" }}>ServerScriptService</strong>. Paste the code below, then replace <Code>Webhook_url</Code> with the URL you copied from Discord.
           </Step>
         </div>
 
-        {/* Lua code block */}
+        {/* Code block */}
         <div style={{ marginBottom: "4rem" }}>
           <div style={{
             display: "flex",
-            alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: "0.75rem",
+            alignItems: "center",
+            marginBottom: "0.6rem",
           }}>
-            <h2 style={{
-              fontFamily: "'Clash Display', 'Manrope', sans-serif",
-              fontWeight: 600,
-              fontSize: "1.05rem",
-              color: "#e5e5e5",
-              letterSpacing: "-0.01em",
-              paddingLeft: "0.85rem",
-              borderLeft: "2px solid #DC2626",
-            }}>ServerScript — paste into ServerScriptService</h2>
+            <span style={{
+              fontFamily: "'Manrope', sans-serif",
+              fontSize: "0.78rem",
+              color: "#4B5563",
+              letterSpacing: "0.05em",
+            }}>ServerScriptService / Script</span>
             <button
               onClick={copyCode}
               style={{
                 fontFamily: "'Manrope', sans-serif",
                 fontSize: "0.75rem",
                 fontWeight: 600,
-                color: copied ? "#4ade80" : "#DC2626",
-                background: copied ? "rgba(74,222,128,0.08)" : "rgba(220,38,38,0.08)",
-                border: `1px solid ${copied ? "rgba(74,222,128,0.25)" : "rgba(220,38,38,0.25)"}`,
-                borderRadius: "6px",
-                padding: "0.35rem 0.85rem",
+                color: copied ? "#4ADE80" : "#9CA3AF",
+                background: "transparent",
+                border: "none",
                 cursor: "pointer",
-                transition: "all 0.2s",
                 letterSpacing: "0.03em",
                 flexShrink: 0,
               }}
@@ -186,61 +250,11 @@ export default function Instructions() {
             overflowX: "auto",
             fontFamily: "'Manrope', 'Courier New', monospace",
             fontSize: "0.78rem",
-            color: "#9ca3af",
             lineHeight: 1.75,
             margin: 0,
           }}>
-            <code>{LUA_CODE}</code>
+            <code>{highlight(LUA_CODE)}</code>
           </pre>
-        </div>
-
-        {/* Commands reference */}
-        <div>
-          <h2 style={{
-            fontFamily: "'Clash Display', 'Manrope', sans-serif",
-            fontWeight: 600,
-            fontSize: "1.05rem",
-            color: "#e5e5e5",
-            letterSpacing: "-0.01em",
-            marginBottom: "1rem",
-            paddingLeft: "0.85rem",
-            borderLeft: "2px solid #DC2626",
-          }}>All commands</h2>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {COMMANDS.map((cmd) => (
-              <div
-                key={cmd.name}
-                style={{
-                  display: "flex",
-                  gap: "1rem",
-                  alignItems: "flex-start",
-                  padding: "0.75rem 1rem",
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid #111",
-                  borderRadius: "8px",
-                }}
-              >
-                <span style={{
-                  fontFamily: "'Manrope', monospace",
-                  fontSize: "0.8rem",
-                  color: "#EF4444",
-                  background: "rgba(220,38,38,0.08)",
-                  border: "1px solid rgba(220,38,38,0.18)",
-                  padding: "0.15rem 0.5rem",
-                  borderRadius: "5px",
-                  whiteSpace: "nowrap" as const,
-                  flexShrink: 0,
-                }}>{cmd.name}</span>
-                <span style={{
-                  fontFamily: "'Manrope', sans-serif",
-                  fontSize: "0.88rem",
-                  color: "#6B7280",
-                  lineHeight: 1.6,
-                }}>{cmd.desc}</span>
-              </div>
-            ))}
-          </div>
         </div>
 
       </div>
