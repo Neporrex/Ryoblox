@@ -1,5 +1,6 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Analytics } from "@vercel/analytics/react";
 import ConstellationCanvas from "@/components/ConstellationCanvas";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -31,6 +32,7 @@ function App() {
         <Navbar />
         <Router />
         <Footer />
+        <Analytics />
       </WouterRouter>
     </QueryClientProvider>
   );
