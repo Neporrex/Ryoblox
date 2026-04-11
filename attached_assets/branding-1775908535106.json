@@ -1,0 +1,120 @@
+{
+  "colorScheme": "dark",
+  "fonts": [
+    {
+      "family": "Manrope",
+      "role": "body"
+    },
+    {
+      "family": "Clash Display",
+      "role": "heading"
+    }
+  ],
+  "colors": {
+    "primary": "#DC2626",
+    "secondary": "#250A0A",
+    "accent": "#DC2626",
+    "background": "#050505",
+    "textPrimary": "#050505",
+    "link": "#9CA3AF"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Manrope",
+      "heading": "Clash Display"
+    },
+    "fontStacks": {
+      "heading": [
+        "Clash Display",
+        "sans-serif"
+      ],
+      "body": [
+        "Manrope",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "Manrope",
+        "sans-serif"
+      ]
+    },
+    "fontSizes": {
+      "h1": "72px",
+      "h2": "72px",
+      "body": "20px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "4px"
+  },
+  "components": {
+    "buttonPrimary": {
+      "background": "#DC2626",
+      "textColor": "#FFFFFF",
+      "borderRadius": "12px",
+      "borderRadiusCorners": {
+        "topLeft": "12px",
+        "topRight": "12px",
+        "bottomRight": "12px",
+        "bottomLeft": "12px"
+      },
+      "shadow": "none"
+    }
+  },
+  "images": {
+    "logo": "File saved at: attached_assets/logo.png",
+    "favicon": "File saved at: attached_assets/favicon.png",
+    "ogImage": "/logo.png",
+    "logoHref": "File saved at: attached_assets/logoHref.html",
+    "logoAlt": "Ryoblox"
+  },
+  "__llm_logo_reasoning": {
+    "selectedIndex": 0,
+    "reasoning": "Selected #0 because it is visible, located in the header, matches the favicon, and links to the homepage, aligning with the brand 'Ryoblox'.",
+    "confidence": 0.9,
+    "source": "llm"
+  },
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": 0,
+      "text": "Add to Discord",
+      "reasoning": "The button 'Add to Discord' uses the vibrant brand color #DC2626, making it the primary call-to-action."
+    },
+    "secondary": {
+      "index": -1,
+      "text": "N/A",
+      "reasoning": "There is only one button detected, so no secondary button is available."
+    },
+    "confidence": 0.95
+  },
+  "personality": {
+    "tone": "bold",
+    "energy": "high",
+    "targetAudience": "tech-savvy users interested in Discord integrations"
+  },
+  "designSystem": {
+    "framework": "tailwind",
+    "componentLibrary": ""
+  },
+  "confidence": {
+    "buttons": 0.95,
+    "colors": 0.9,
+    "overall": 0.925
+  },
+  "__llm_metadata": {
+    "logoSelection": {
+      "llmCalled": true,
+      "llmSucceeded": true,
+      "finalSource": "llm",
+      "rawLogoSelection": {
+        "selectedLogoIndex": 0,
+        "selectedLogoReasoning": "Selected #0 because it is visible, located in the header, matches the favicon, and links to the homepage, aligning with the brand 'Ryoblox'.",
+        "confidence": 0.9
+      }
+    },
+    "buttonClassification": {
+      "llmCalled": true,
+      "llmSucceeded": true
+    }
+  }
+}
