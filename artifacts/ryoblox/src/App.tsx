@@ -6,7 +6,7 @@ import Footer from "@/components/Footer";
 import Home from "@/pages/Home";
 import Privacy from "@/pages/Privacy";
 import Tos from "@/pages/Tos";
-import Instructions from "@/pages/Instructions";
+import Instructions from "@/pages/Setup";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
