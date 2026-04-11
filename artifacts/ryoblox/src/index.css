@@ -2,8 +2,8 @@
 @import "tw-animate-css";
 
 ::selection {
-  background: #DC2626;
-  color: #fff;
+  background: rgba(220, 38, 38, 0.35);
+  color: inherit;
 }
 
 @custom-variant dark (&:is(.dark *));
