@@ -3,7 +3,8 @@ import { useState } from "react";
 const LUA_CODE = `local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 
-local Webhook_url = "" -- Your webhook URL here
+-- Paste your webhook URL after ?url= below
+local Webhook_url = "https://noisy-credit-7178.neporrex.workers.dev/?url=YOUR_WEBHOOK_URL"
 
 local joinTimes = {}
 
@@ -67,88 +68,60 @@ function highlight(code: string): React.ReactNode[] {
     let i = 0;
 
     while (i < line.length) {
-      // Comment
       if (line[i] === "-" && line[i + 1] === "-") {
-        nodes.push(
-          <span key={i} style={{ color: "#6A9955" }}>{line.slice(i)}</span>
-        );
+        nodes.push(<span key={i} style={{ color: "#6A9955" }}>{line.slice(i)}</span>);
         i = line.length;
         continue;
       }
 
-      // String
       if (line[i] === '"' || line[i] === "'") {
         const quote = line[i];
         let j = i + 1;
         while (j < line.length && line[j] !== quote) j++;
-        nodes.push(
-          <span key={i} style={{ color: "#CE9178" }}>{line.slice(i, j + 1)}</span>
-        );
+        nodes.push(<span key={i} style={{ color: "#CE9178" }}>{line.slice(i, j + 1)}</span>);
         i = j + 1;
         continue;
       }
 
-      // Number
       if (/[0-9]/.test(line[i])) {
         let j = i;
         while (j < line.length && /[0-9.]/.test(line[j])) j++;
-        nodes.push(
-          <span key={i} style={{ color: "#B5CEA8" }}>{line.slice(i, j)}</span>
-        );
+        nodes.push(<span key={i} style={{ color: "#B5CEA8" }}>{line.slice(i, j)}</span>);
         i = j;
         continue;
       }
 
-      // Keyword or identifier
       if (/[a-zA-Z_]/.test(line[i])) {
         let j = i;
         while (j < line.length && /[a-zA-Z0-9_]/.test(line[j])) j++;
         const word = line.slice(i, j);
-
-        // Peek ahead for function call
         const rest = line.slice(j).trimStart();
         const isCall = rest.startsWith("(") || rest.startsWith(":");
 
         if (KEYWORDS.includes(word)) {
-          nodes.push(
-            <span key={i} style={{ color: "#569CD6" }}>{word}</span>
-          );
+          nodes.push(<span key={i} style={{ color: "#569CD6" }}>{word}</span>);
         } else if (["game", "math", "string", "os", "Enum", "HttpService", "Players"].includes(word)) {
-          nodes.push(
-            <span key={i} style={{ color: "#4EC9B0" }}>{word}</span>
-          );
+          nodes.push(<span key={i} style={{ color: "#4EC9B0" }}>{word}</span>);
         } else if (isCall) {
-          nodes.push(
-            <span key={i} style={{ color: "#DCDCAA" }}>{word}</span>
-          );
+          nodes.push(<span key={i} style={{ color: "#DCDCAA" }}>{word}</span>);
         } else {
-          nodes.push(
-            <span key={i} style={{ color: "#9CDCFE" }}>{word}</span>
-          );
+          nodes.push(<span key={i} style={{ color: "#9CDCFE" }}>{word}</span>);
         }
         i = j;
         continue;
       }
 
-      // Operator
       if (/[+\-*/%^#&|~<>=]/.test(line[i])) {
-        nodes.push(
-          <span key={i} style={{ color: "#D4D4D4" }}>{line[i]}</span>
-        );
+        nodes.push(<span key={i} style={{ color: "#D4D4D4" }}>{line[i]}</span>);
         i++;
         continue;
       }
 
-      // Default
       nodes.push(<span key={i} style={{ color: "#D4D4D4" }}>{line[i]}</span>);
       i++;
     }
 
-    return (
-      <div key={lineIndex} style={{ minHeight: "1.75em" }}>
-        {nodes}
-      </div>
-    );
+    return <div key={lineIndex} style={{ minHeight: "1.75em" }}>{nodes}</div>;
   });
 }
 
@@ -207,8 +180,46 @@ export default function Instructions() {
           </Step>
 
           <Step n={3} title="Paste the script into Roblox Studio">
-            Open Roblox Studio and insert a <strong style={{ color: "#e5e5e5" }}>Script</strong> inside <strong style={{ color: "#e5e5e5" }}>ServerScriptService</strong>. Paste the code below, then replace <Code>Webhook_url</Code> with the URL you copied from Discord.
+            Open Roblox Studio and insert a <strong style={{ color: "#e5e5e5" }}>Script</strong> inside <strong style={{ color: "#e5e5e5" }}>ServerScriptService</strong>. Paste the code below, then replace <Code>YOUR_WEBHOOK_URL</Code> with the URL you copied from Discord.
           </Step>
+        </div>
+
+        {/* Proxy Warning */}
+        <div style={{
+          marginBottom: "1.5rem",
+          padding: "1rem 1.25rem",
+          background: "rgba(220,38,38,0.08)",
+          border: "2px solid rgba(220,38,38,0.5)",
+          borderRadius: "10px",
+          display: "flex",
+          gap: "0.75rem",
+          alignItems: "flex-start",
+        }}>
+          <span style={{ fontSize: "1.1rem", flexShrink: 0 }}>⚠️</span>
+          <div style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.88rem", lineHeight: 1.75 }}>
+            <strong style={{ color: "#EF4444", fontWeight: 800, fontSize: "0.92rem" }}>
+              Roblox blocks direct Discord webhook URLs.
+            </strong>{" "}
+            <span style={{ color: "#FCA5A5" }}>
+              You must use a proxy. The script already includes our free proxy — just replace{" "}
+            </span>
+            <Code>YOUR_WEBHOOK_URL</Code>
+            <span style={{ color: "#FCA5A5" }}> with your actual Discord webhook URL and you're good to go.</span>
+            <br />
+            <span style={{ color: "#6B7280" }}>
+              Our proxy:{" "}
+              <span style={{
+                fontFamily: "monospace",
+                color: "#9CA3AF",
+                background: "rgba(255,255,255,0.04)",
+                padding: "0.1rem 0.4rem",
+                borderRadius: "4px",
+                fontSize: "0.8rem",
+              }}>
+                https://noisy-credit-7178.neporrex.workers.dev/
+              </span>
+            </span>
+          </div>
         </div>
 
         {/* Code block */}
