@@ -1,0 +1,192 @@
+Here is the fully updated code. I have added a new command called **`/stats_all`** that gives you the overall analytics for your entire game (all players combined). 
+
+Now your bot will have three powerful commands:
+1. **`/stats_top`** - Shows a bar chart of the top 10 players who joined the most.
+2. **`/stats_player [username]`** - Shows specific stats and a history line chart for the exact player you type in.
+3. **`/stats_all`** - Shows the total joins across the whole game, total unique players, and a line chart of your game's overall traffic over time.
+
+You can replace your entire `bot.py` file with this code. Just remember to put your Token and Channel ID at the bottom and top where indicated!
+
+```python
+import discord
+from discord.ext import commands
+from discord import app_commands
+import sqlite3
+import matplotlib.pyplot as plt
+import io
+
+# --- Database Setup ---
+conn = sqlite3.connect('analytics.db')
+cursor = conn.cursor()
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS player_joins (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+''')
+conn.commit()
+
+# --- Bot Setup ---
+class AnalyticsBot(commands.Bot):
+    def __init__(self):
+        intents = discord.Intents.default()
+        intents.message_content = True 
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        await self.tree.sync()
+        print("Bot is ready and slash commands synced!")
+
+bot = AnalyticsBot()
+
+TARGET_CHANNEL_ID = 123456789012345678  # <-- REPLACE THIS WITH YOUR WEBHOOK CHANNEL ID
+
+# --- Listen for Webhook Messages ---
+@bot.event
+async def on_message(message):
+    if message.channel.id != TARGET_CHANNEL_ID:
+        return
+
+    if message.webhook_id is not None:
+        lines = message.content.split('\n')
+        for line in lines:
+            line = line.strip()
+            if line.startswith("New player joined:"):
+                username = line.replace("New player joined:", "").strip()
+                cursor.execute("INSERT INTO player_joins (username) VALUES (?)", (username,))
+                conn.commit()
+                print(f"Logged join for: {username}")
+
+
+# --- Command 1: Top Players Chart ---
+@bot.tree.command(name="stats_top", description="Generates a chart of the top 10 most frequent players")
+async def stats_top(interaction: discord.Interaction):
+    cursor.execute("""
+        SELECT username, COUNT(*) as join_count 
+        FROM player_joins 
+        GROUP BY username 
+        ORDER BY join_count DESC 
+        LIMIT 10
+    """)
+    data = cursor.fetchall()
+
+    if not data:
+        await interaction.response.send_message("No player data found yet!", ephemeral=True)
+        return
+
+    usernames = [row[0] for row in data]
+    counts = [row[1] for row in data]
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(usernames, counts, color='royalblue')
+    plt.xlabel('Player Names', fontsize=12)
+    plt.ylabel('Total Joins', fontsize=12)
+    plt.title('Top 10 Players by Joins', fontsize=15)
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(range(0, max(counts) + 2))
+    plt.tight_layout()
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    plt.close() 
+
+    file = discord.File(buffer, filename="top_players.png")
+    await interaction.response.send_message(content="📊 **Here are the top players of all time:**", file=file)
+
+
+# --- Command 2: Specific Player Stats ---
+@bot.tree.command(name="stats_player", description="Check the stats and chart for a specific player")
+@app_commands.describe(username="The Roblox username to search for")
+async def stats_player(interaction: discord.Interaction, username: str):
+    cursor.execute("SELECT COUNT(*) FROM player_joins WHERE username = ? COLLATE NOCASE", (username,))
+    total_joins = cursor.fetchone()[0]
+
+    if total_joins == 0:
+        await interaction.response.send_message(f"Player **{username}** hasn't joined the game yet or isn't logged!", ephemeral=True)
+        return
+
+    cursor.execute("""
+        SELECT DATE(timestamp) as join_date, COUNT(*) as daily_joins
+        FROM player_joins
+        WHERE username = ? COLLATE NOCASE
+        GROUP BY join_date
+        ORDER BY join_date
+    """, (username,))
+    data = cursor.fetchall()
+
+    dates = [row[0] for row in data]
+    counts = [row[1] for row in data]
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(dates, counts, marker='o', linestyle='-', color='crimson', linewidth=2)
+    plt.xlabel('Date', fontsize=12)
+    plt.ylabel('Joins', fontsize=12)
+    plt.title(f'Join History for {username}', fontsize=15)
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(range(0, max(counts) + 2))
+    plt.tight_layout()
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    plt.close()
+
+    file = discord.File(buffer, filename=f"{username}_stats.png")
+    await interaction.response.send_message(
+        content=f"🎮 **{username}** has joined **{total_joins}** times in total!\nHere is their activity over time:", 
+        file=file
+    )
+
+
+# --- Command 3: All Players Overall Stats ---
+@bot.tree.command(name="stats_all", description="View overall join statistics for the entire game")
+async def stats_all(interaction: discord.Interaction):
+    # Get total overall joins
+    cursor.execute("SELECT COUNT(*) FROM player_joins")
+    total_joins = cursor.fetchone()[0]
+
+    # Get total unique players
+    cursor.execute("SELECT COUNT(DISTINCT username) FROM player_joins")
+    unique_players = cursor.fetchone()[0]
+
+    if total_joins == 0:
+        await interaction.response.send_message("No players have joined the game yet!", ephemeral=True)
+        return
+
+    # Get joins per day for ALL players combined
+    cursor.execute("""
+        SELECT DATE(timestamp) as join_date, COUNT(*) as daily_joins
+        FROM player_joins
+        GROUP BY join_date
+        ORDER BY join_date
+    """)
+    data = cursor.fetchall()
+
+    dates = [row[0] for row in data]
+    counts = [row[1] for row in data]
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(dates, counts, marker='s', linestyle='-', color='forestgreen', linewidth=2)
+    plt.xlabel('Date', fontsize=12)
+    plt.ylabel('Total Server Joins', fontsize=12)
+    plt.title('Game Traffic Over Time (All Players)', fontsize=15)
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(range(0, max(counts) + 2))
+    plt.tight_layout()
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    plt.close()
+
+    file = discord.File(buffer, filename="overall_stats.png")
+    await interaction.response.send_message(
+        content=f"🌍 **Overall Game Stats:**\nTotal Joins: **{total_joins}**\nUnique Players: **{unique_players}**\n\nHere is your game's traffic over time:", 
+        file=file
+    )
+
+# Run the bot
+bot.run('YOUR_BOT_TOKEN_HERE') # <-- REPLACE THIS WITH YOUR BOT TOKEN
+```

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Ryoblox Bot"
+version = "1.0.0"
+id = "artifacts/ryoblox"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19861
+
+[services.development]
+run = "pnpm --filter @workspace/ryoblox run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ryoblox", "run", "build" ]
+publicDir = "artifacts/ryoblox/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19861"
+BASE_PATH = "/"
