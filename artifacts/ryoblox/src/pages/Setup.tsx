@@ -2,13 +2,26 @@ import { useState } from "react";
 
 const LUA_CODE = `local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 
--- Paste your webhook URL after ?url= below
 local Webhook_url = "https://noisy-credit-7178.neporrex.workers.dev/?url=YOUR_WEBHOOK_URL"
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Game pass registry — fill in your real Robux prices
+-- ─────────────────────────────────────────────────────────────────────────
+local GAME_PASSES = {
+    [111111] = { name = "Example Pass", robux = 0 },
+}
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Developer product registry — fill in your real Robux prices
+-- ─────────────────────────────────────────────────────────────────────────
+local DEV_PRODUCTS = {
+  [22222222] = { name = "Example Dev Product", robux = 0   },
+}
 
 local joinTimes = {}
 
--- Convert seconds to a readable time format
 local function formatTime(seconds)
     local h = math.floor(seconds / 3600)
     local m = math.floor((seconds % 3600) / 60)
@@ -22,44 +35,92 @@ local function formatTime(seconds)
     end
 end
 
--- Send a message when a player joins
-local function sendJoin(player)
-    local data = {
-        ["content"] = "New player joined: " .. player.Name
-    }
-    local jsonData = HttpService:JSONEncode(data)
-    pcall(function()
-        HttpService:PostAsync(Webhook_url, jsonData, Enum.HttpContentType.ApplicationJson)
+local function sendWebhook(message)
+    local success, err = pcall(function()
+        HttpService:PostAsync(
+            Webhook_url,
+            HttpService:JSONEncode({ content = message }),
+            Enum.HttpContentType.ApplicationJson
+        )
     end)
+    if not success then
+        warn("[Ryoblox] Webhook failed: " .. tostring(err))
+    end
 end
 
--- Send a message when a player leaves, including playtime
-local function sendLeave(player)
+-- ── Player join / leave ──────────────────────────────────────────────────
+Players.PlayerAdded:Connect(function(player)
+    joinTimes[player.UserId] = os.time()
+    sendWebhook("New player joined: " .. player.Name)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
     local joinTime = joinTimes[player.UserId]
     local playtime = "unknown"
     if joinTime then
         playtime = formatTime(os.time() - joinTime)
         joinTimes[player.UserId] = nil
     end
-    local data = {
-        ["content"] = "Player left: " .. player.Name .. " | Playtime: " .. playtime
-    }
-    local jsonData = HttpService:JSONEncode(data)
-    pcall(function()
-        HttpService:PostAsync(Webhook_url, jsonData, Enum.HttpContentType.ApplicationJson)
-    end)
-end
-
-Players.PlayerAdded:Connect(function(player)
-    joinTimes[player.UserId] = os.time()
-    sendJoin(player)
+    sendWebhook("Player left: " .. player.Name .. " | Playtime: " .. playtime)
 end)
 
-Players.PlayerRemoving:Connect(function(player)
-    sendLeave(player)
-end)`;
+-- ── Game pass purchases ──────────────────────────────────────────────────
+MarketplaceService.PromptGamePassPurchaseFinished:Connect(
+    function(player, passId, wasPurchased)
+        if not wasPurchased then return end
+        local info  = GAME_PASSES[passId]
+        local name  = info and info.name  or ("GamePass:" .. tostring(passId))
+        local robux = info and info.robux or 0
+        sendWebhook(string.format(
+            "Robux earned: %d | Player: %s | Item: %s",
+            robux, player.Name, name
+        ))
+    end
+)
 
-const KEYWORDS = ["local", "function", "end", "if", "then", "elseif", "else", "return", "and", "or", "not", "nil", "true", "false", "do", "while", "for", "in", "repeat", "until", "break"];
+-- ── Developer product purchases ──────────────────────────────────────────
+-- Add your own productFunctions entries below if you have more products.
+local productFunctions = {}
+
+MarketplaceService.ProcessReceipt = function(receiptInfo)
+    local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
+    if not player then
+        return Enum.ProductPurchaseDecision.NotProcessedYet
+    end
+
+    local handler = productFunctions[receiptInfo.ProductId]
+    local granted = false
+    if handler then
+        local ok, result = pcall(handler, receiptInfo, player)
+        granted = ok and result
+    else
+        granted = true -- no handler needed, just log the purchase
+    end
+
+    if granted then
+        local info  = DEV_PRODUCTS[receiptInfo.ProductId]
+        local name  = info and info.name  or ("Product:" .. tostring(receiptInfo.ProductId))
+        local robux = info and info.robux or 0
+        sendWebhook(string.format(
+            "Robux earned: %d | Player: %s | Item: %s",
+            robux, player.Name, name
+        ))
+        return Enum.ProductPurchaseDecision.PurchaseGranted
+    end
+
+    return Enum.ProductPurchaseDecision.NotProcessedYet
+end`;
+
+const KEYWORDS = [
+  "local","function","end","if","then","elseif","else","return",
+  "and","or","not","nil","true","false","do","while","for","in",
+  "repeat","until","break","tostring","pcall","pairs","ipairs","math",
+];
+
+const BUILTINS = [
+  "game","string","os","Enum","HttpService","Players","MarketplaceService",
+  "workspace","print","warn","wait",
+];
 
 function highlight(code: string): React.ReactNode[] {
   const lines = code.split("\n");
@@ -68,12 +129,14 @@ function highlight(code: string): React.ReactNode[] {
     let i = 0;
 
     while (i < line.length) {
+      // Comments
       if (line[i] === "-" && line[i + 1] === "-") {
-        nodes.push(<span key={i} style={{ color: "#6A9955" }}>{line.slice(i)}</span>);
+        nodes.push(<span key={i} style={{ color: "#6A9955", fontStyle: "italic" }}>{line.slice(i)}</span>);
         i = line.length;
         continue;
       }
 
+      // Strings
       if (line[i] === '"' || line[i] === "'") {
         const quote = line[i];
         let j = i + 1;
@@ -83,6 +146,7 @@ function highlight(code: string): React.ReactNode[] {
         continue;
       }
 
+      // Numbers
       if (/[0-9]/.test(line[i])) {
         let j = i;
         while (j < line.length && /[0-9.]/.test(line[j])) j++;
@@ -91,6 +155,7 @@ function highlight(code: string): React.ReactNode[] {
         continue;
       }
 
+      // Words
       if (/[a-zA-Z_]/.test(line[i])) {
         let j = i;
         while (j < line.length && /[a-zA-Z0-9_]/.test(line[j])) j++;
@@ -98,21 +163,19 @@ function highlight(code: string): React.ReactNode[] {
         const rest = line.slice(j).trimStart();
         const isCall = rest.startsWith("(") || rest.startsWith(":");
 
-        if (KEYWORDS.includes(word)) {
-          nodes.push(<span key={i} style={{ color: "#569CD6" }}>{word}</span>);
-        } else if (["game", "math", "string", "os", "Enum", "HttpService", "Players"].includes(word)) {
-          nodes.push(<span key={i} style={{ color: "#4EC9B0" }}>{word}</span>);
-        } else if (isCall) {
-          nodes.push(<span key={i} style={{ color: "#DCDCAA" }}>{word}</span>);
-        } else {
-          nodes.push(<span key={i} style={{ color: "#9CDCFE" }}>{word}</span>);
-        }
+        let color = "#9CDCFE";
+        if (KEYWORDS.includes(word)) color = "#569CD6";
+        else if (BUILTINS.includes(word)) color = "#4EC9B0";
+        else if (isCall) color = "#DCDCAA";
+
+        nodes.push(<span key={i} style={{ color }}>{word}</span>);
         i = j;
         continue;
       }
 
-      if (/[+\-*/%^#&|~<>=]/.test(line[i])) {
-        nodes.push(<span key={i} style={{ color: "#D4D4D4" }}>{line[i]}</span>);
+      // Section dividers (─)
+      if (line[i] === "─") {
+        nodes.push(<span key={i} style={{ color: "#333" }}>{line[i]}</span>);
         i++;
         continue;
       }
@@ -176,11 +239,25 @@ export default function Instructions() {
           </Step>
 
           <Step n={2} title="Create a Discord webhook">
-            In your Discord server, go to the channel where you want to receive join events. Open <strong style={{ color: "#e5e5e5" }}>Channel Settings → Integrations → Webhooks → New Webhook</strong>. Copy the webhook URL — you'll paste it into the Lua script shortly.
+            In your Discord server, go to the channel where you want to receive join events. Open{" "}
+            <strong style={{ color: "#e5e5e5" }}>Channel Settings → Integrations → Webhooks → New Webhook</strong>.
+            Copy the webhook URL — you'll paste it into the Lua script shortly.
           </Step>
 
           <Step n={3} title="Paste the script into Roblox Studio">
-            Open Roblox Studio and insert a <strong style={{ color: "#e5e5e5" }}>Script</strong> inside <strong style={{ color: "#e5e5e5" }}>ServerScriptService</strong>. Paste the code below, then replace <Code>YOUR_WEBHOOK_URL</Code> with the URL you copied from Discord.
+            Open Roblox Studio and insert a <strong style={{ color: "#e5e5e5" }}>Script</strong> inside{" "}
+            <strong style={{ color: "#e5e5e5" }}>ServerScriptService</strong>. Paste the code below, then replace{" "}
+            <Code>YOUR_WEBHOOK_URL</Code> with the URL you copied from Discord.
+          </Step>
+
+          <Step n={4} title="Configure your game passes and products">
+            At the top of the script, fill in the <Code>robux</Code> prices for each game pass and developer product.
+            These are the Robux amounts players pay — they'll show up in <Code>/stats_revenue</Code> and the daily digest.
+          </Step>
+
+          <Step n={5} title="Run /set-channel and /set-digest-channel in Discord">
+            In your Discord server, use <Code>/set-channel</Code> to tell Ryoblox which channel receives the webhook messages,
+            then optionally use <Code>/set-digest-channel</Code> to pick a channel for the automatic daily summary posted every midnight UTC.
           </Step>
         </div>
 
@@ -222,6 +299,53 @@ export default function Instructions() {
           </div>
         </div>
 
+        {/* Webhook format reference */}
+        <div style={{
+          marginBottom: "1.5rem",
+          padding: "1rem 1.25rem",
+          background: "rgba(255,255,255,0.02)",
+          border: "1px solid #1a1a1a",
+          borderRadius: "10px",
+        }}>
+          <p style={{
+            fontFamily: "'Manrope', sans-serif",
+            fontSize: "0.78rem",
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase" as const,
+            color: "#4B5563",
+            marginBottom: "0.75rem",
+          }}>Webhook message formats</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+            {[
+              ["Join",        "New player joined: Username"],
+              ["Leave",       "Player left: Username | Playtime: 1h 2m 3s"],
+              ["Game pass",   "Robux earned: 99 | Player: Username | Item: VIP Pass"],
+              ["Dev product", "Robux earned: 50 | Player: Username | Item: Make it Rain 10k"],
+            ].map(([label, example]) => (
+              <div key={label} style={{ display: "flex", gap: "0.75rem", alignItems: "baseline" }}>
+                <span style={{
+                  fontFamily: "'Manrope', sans-serif",
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  color: "#DC2626",
+                  minWidth: "80px",
+                  flexShrink: 0,
+                }}>{label}</span>
+                <span style={{
+                  fontFamily: "monospace",
+                  fontSize: "0.78rem",
+                  color: "#6B7280",
+                  background: "rgba(255,255,255,0.03)",
+                  padding: "0.15rem 0.5rem",
+                  borderRadius: "4px",
+                  border: "1px solid #111",
+                }}>{example}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Code block */}
         <div style={{ marginBottom: "4rem" }}>
           <div style={{
@@ -247,6 +371,7 @@ export default function Instructions() {
                 border: "none",
                 cursor: "pointer",
                 letterSpacing: "0.03em",
+                transition: "color 0.15s",
                 flexShrink: 0,
               }}
             >
@@ -259,13 +384,67 @@ export default function Instructions() {
             borderRadius: "10px",
             padding: "1.5rem",
             overflowX: "auto",
-            fontFamily: "'Manrope', 'Courier New', monospace",
+            fontFamily: "'Fira Code', 'Courier New', monospace",
             fontSize: "0.78rem",
             lineHeight: 1.75,
             margin: 0,
           }}>
             <code>{highlight(LUA_CODE)}</code>
           </pre>
+        </div>
+
+        {/* Commands reference */}
+        <div style={{ marginBottom: "4rem" }}>
+          <p style={{
+            fontFamily: "'Manrope', sans-serif",
+            fontSize: "0.72rem",
+            fontWeight: 700,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase" as const,
+            color: "#DC2626",
+            marginBottom: "1.25rem",
+          }}>Available commands</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {[
+              ["/set-channel",         "Point Ryoblox at the channel receiving webhook messages. Requires Manage Server."],
+              ["/set-digest-channel",  "Choose a channel for the automatic midnight UTC daily summary."],
+              ["/stats_top",           "Bar chart of the top 10 most frequent players for a chosen period."],
+              ["/stats_player",        "Cumulative join history and total playtime for a specific player."],
+              ["/stats_all",           "Full game traffic as a cumulative chart."],
+              ["/stats_today",         "Today's join count, unique players, and top 5."],
+              ["/stats_week",          "Last 7 days of traffic as a cumulative chart."],
+              ["/stats_heatmap",       "Activity heatmap by hour of day and day of week."],
+              ["/stats_revenue",       "Robux earnings overview — totals, top buyers, and top items."],
+              ["/leaderboard",         "Text leaderboard of the top 15 players."],
+              ["/playtime_top",        "Top 10 players ranked by total in-game playtime."],
+              ["/purge",               "Delete messages from a specific user or the entire channel."],
+              ["/ping",                "Check bot latency."],
+            ].map(([cmd, desc]) => (
+              <div key={cmd as string} style={{
+                display: "flex",
+                gap: "1rem",
+                alignItems: "baseline",
+                padding: "0.65rem 1rem",
+                background: "rgba(255,255,255,0.015)",
+                border: "1px solid #111",
+                borderRadius: "8px",
+              }}>
+                <span style={{
+                  fontFamily: "'Fira Code', monospace",
+                  fontSize: "0.8rem",
+                  color: "#DC2626",
+                  minWidth: "190px",
+                  flexShrink: 0,
+                }}>{cmd}</span>
+                <span style={{
+                  fontFamily: "'Manrope', sans-serif",
+                  fontSize: "0.85rem",
+                  color: "#6B7280",
+                  lineHeight: 1.6,
+                }}>{desc}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
       </div>
@@ -279,7 +458,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
       display: "flex",
       gap: "1.25rem",
       alignItems: "flex-start",
-      padding: "1.25rem 1.25rem",
+      padding: "1.25rem",
       background: "rgba(255,255,255,0.02)",
       border: "1px solid #111",
       borderRadius: "10px",
@@ -321,7 +500,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 function Code({ children }: { children: React.ReactNode }) {
   return (
     <span style={{
-      fontFamily: "'Manrope', monospace",
+      fontFamily: "'Fira Code', monospace",
       fontSize: "0.82rem",
       color: "#EF4444",
       background: "rgba(220,38,38,0.08)",
