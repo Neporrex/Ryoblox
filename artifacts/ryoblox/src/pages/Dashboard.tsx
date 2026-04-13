@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   getStats,
@@ -13,8 +13,9 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API = "https://ryo-api.vercel.app";
-const OAUTH_URL =
-  "https://discord.com/oauth2/authorize?client_id=1492484301600718938&permissions=6761431819611478&response_type=code&redirect_uri=https%3A%2F%2Fryoblox.vercel.app%2Fdashboard&integration_type=1&scope=guilds+bot+guilds.members.read+identify+messages.read";
+const DISCORD_CLIENT_ID = "1492484301600718938";
+const REDIRECT_URI = "https://ryoblox.vercel.app/dashboard";
+const OAUTH_URL = `https://discord.com/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=identify%20guilds`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,14 @@ interface Guild {
   name: string;
   icon: string | null;
   owner: boolean;
+}
+
+interface DiscordUser {
+  id: string;
+  username: string;
+  discriminator: string;
+  avatar: string | null;
+  global_name: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -46,6 +55,16 @@ function fmtHour(h: number): string {
   return `${h - 12} PM`;
 }
 
+function getUserAvatarUrl(user: DiscordUser): string {
+  if (user.avatar) {
+    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${user.avatar.startsWith("a_") ? "gif" : "png"}?size=128`;
+  }
+  const defaultIndex = user.discriminator === "0"
+    ? (BigInt(user.id) >> 22n) % 6n
+    : Number(user.discriminator) % 5;
+  return `https://cdn.discordapp.com/embed/avatars/${defaultIndex}.png`;
+}
+
 const MEDALS = ["🥇", "🥈", "🥉"];
 const PERIOD_LABELS: Record<Period, string> = {
   all: "All Time",
@@ -53,6 +72,32 @@ const PERIOD_LABELS: Record<Period, string> = {
   month: "30 Days",
   today: "Today",
 };
+
+// ─── Storage helpers ──────────────────────────────────────────────────────────
+
+function saveSession(token: string, user: DiscordUser, guilds: Guild[]) {
+  localStorage.setItem("ryo_token", token);
+  localStorage.setItem("ryo_user", JSON.stringify(user));
+  localStorage.setItem("ryo_guilds", JSON.stringify(guilds));
+}
+
+function loadSession(): { token: string; user: DiscordUser; guilds: Guild[] } | null {
+  try {
+    const token = localStorage.getItem("ryo_token");
+    const user = localStorage.getItem("ryo_user");
+    const guilds = localStorage.getItem("ryo_guilds");
+    if (token && user && guilds) {
+      return { token, user: JSON.parse(user), guilds: JSON.parse(guilds) };
+    }
+  } catch {}
+  return null;
+}
+
+function clearSession() {
+  localStorage.removeItem("ryo_token");
+  localStorage.removeItem("ryo_user");
+  localStorage.removeItem("ryo_guilds");
+}
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
@@ -122,6 +167,253 @@ function Spinner() {
       <div style={{ width: "18px", height: "18px", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "#5865F2", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
+  );
+}
+
+// ─── User Profile Widget ──────────────────────────────────────────────────────
+
+function UserProfileWidget({ user, onLogout }: { user: DiscordUser; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const displayName = user.global_name || user.username;
+  const avatarUrl = getUserAvatarUrl(user);
+
+  return (
+    <div ref={ref} style={{ position: "fixed", top: "1.25rem", right: "1.5rem", zIndex: 1000 }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.6rem",
+          padding: "0.4rem 0.75rem 0.4rem 0.4rem",
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: "50px",
+          cursor: "pointer",
+          transition: "all 0.2s",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.07)";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.12)";
+        }}
+        onMouseLeave={(e) => {
+          if (!open) {
+            (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.04)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.08)";
+          }
+        }}
+      >
+        <img
+          src={avatarUrl}
+          alt={displayName}
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "50%",
+            objectFit: "cover",
+          }}
+        />
+        <span
+          style={{
+            fontFamily: "'Manrope', sans-serif",
+            fontSize: "0.8rem",
+            fontWeight: 600,
+            color: "#e5e5e5",
+          }}
+        >
+          {displayName}
+        </span>
+        <svg
+          width="12"
+          height="12"
+          fill="none"
+          stroke="#6B7280"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+          style={{
+            transition: "transform 0.2s",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            right: 0,
+            width: "280px",
+            background: "#1a1a1a",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "12px",
+            overflow: "hidden",
+            boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
+            animation: "fadeInDropdown 0.15s ease-out",
+          }}
+        >
+          <style>{`
+            @keyframes fadeInDropdown {
+              from { opacity: 0; transform: translateY(-6px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
+
+          {/* Banner area */}
+          <div
+            style={{
+              height: "60px",
+              background: "linear-gradient(135deg, #5865F2 0%, #DC2626 100%)",
+              position: "relative",
+            }}
+          />
+
+          {/* Avatar overlapping banner */}
+          <div style={{ padding: "0 1rem 1rem", marginTop: "-28px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-end",
+                gap: "0.75rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <img
+                src={avatarUrl}
+                alt={displayName}
+                style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "50%",
+                  border: "4px solid #1a1a1a",
+                  objectFit: "cover",
+                }}
+              />
+              <div style={{ paddingBottom: "4px" }}>
+                <p
+                  style={{
+                    fontFamily: "'Manrope', sans-serif",
+                    fontWeight: 700,
+                    color: "#fff",
+                    fontSize: "0.95rem",
+                    margin: 0,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {displayName}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "'Manrope', sans-serif",
+                    color: "#6B7280",
+                    fontSize: "0.72rem",
+                    margin: 0,
+                  }}
+                >
+                  {user.username}
+                  {user.discriminator !== "0" ? `#${user.discriminator}` : ""}
+                </p>
+              </div>
+            </div>
+
+            <div
+              style={{
+                height: "1px",
+                background: "rgba(255,255,255,0.06)",
+                margin: "0 -0.25rem 0.75rem",
+              }}
+            />
+
+            {/* Info section */}
+            <div
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                borderRadius: "8px",
+                padding: "0.75rem",
+                marginBottom: "0.75rem",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: "'Manrope', sans-serif",
+                  fontSize: "0.65rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: "#9CA3AF",
+                  marginBottom: "0.3rem",
+                }}
+              >
+                Discord ID
+              </p>
+              <p
+                style={{
+                  fontFamily: "'Manrope', sans-serif",
+                  fontSize: "0.8rem",
+                  color: "#d1d5db",
+                  margin: 0,
+                }}
+              >
+                {user.id}
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setOpen(false);
+                onLogout();
+              }}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+                padding: "0.6rem",
+                background: "rgba(220,38,38,0.08)",
+                border: "1px solid rgba(220,38,38,0.15)",
+                borderRadius: "8px",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                fontFamily: "'Manrope', sans-serif",
+                fontSize: "0.78rem",
+                fontWeight: 600,
+                color: "#EF4444",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(220,38,38,0.15)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(220,38,38,0.3)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(220,38,38,0.08)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(220,38,38,0.15)";
+              }}
+            >
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -513,12 +805,25 @@ function DashboardContent({ guildId, guildName, onBack }: { guildId: string; gui
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [stage, setStage]         = useState<Stage>("connect");
-  const [token, setToken]         = useState<string | null>(null);
-  const [guilds, setGuilds]       = useState<Guild[]>([]);
+  const [stage, setStage]                 = useState<Stage>("connect");
+  const [token, setToken]                 = useState<string | null>(null);
+  const [user, setUser]                   = useState<DiscordUser | null>(null);
+  const [guilds, setGuilds]               = useState<Guild[]>([]);
   const [selectedGuild, setSelectedGuild] = useState<Guild | null>(null);
-  const [error, setError]         = useState<string | null>(null);
+  const [error, setError]                 = useState<string | null>(null);
 
+  // Restore session on mount
+  useEffect(() => {
+    const session = loadSession();
+    if (session) {
+      setToken(session.token);
+      setUser(session.user);
+      setGuilds(session.guilds);
+      setStage("pick");
+    }
+  }, []);
+
+  // Handle OAuth callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
@@ -535,6 +840,15 @@ export default function Dashboard() {
         const accessToken: string = data.access_token;
         setToken(accessToken);
 
+        // Fetch user info
+        const userRes = await fetch("https://discord.com/api/v10/users/@me", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!userRes.ok) throw new Error("Failed to fetch user info");
+        const userData: DiscordUser = await userRes.json();
+        setUser(userData);
+
+        // Fetch guilds
         const guildsRes = await fetch(`${API}/api/guilds`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
@@ -542,6 +856,7 @@ export default function Dashboard() {
         if (guildsData.error) throw new Error(guildsData.error);
 
         setGuilds(guildsData.guilds);
+        saveSession(accessToken, userData, guildsData.guilds);
         setStage("pick");
       })
       .catch((err) => {
@@ -550,8 +865,21 @@ export default function Dashboard() {
       });
   }, []);
 
+  const handleLogout = () => {
+    clearSession();
+    setToken(null);
+    setUser(null);
+    setGuilds([]);
+    setSelectedGuild(null);
+    setStage("connect");
+  };
+
+  const isLoggedIn = stage !== "connect" && stage !== "loading" && user;
+
   return (
     <div className="page-content">
+      {isLoggedIn && <UserProfileWidget user={user} onLogout={handleLogout} />}
+
       {stage === "connect"   && <ConnectScreen error={error ?? undefined} />}
       {stage === "loading"   && <ConnectScreen loading />}
       {stage === "pick"      && <GuildPicker guilds={guilds} onSelect={(g) => { setSelectedGuild(g); setStage("dashboard"); }} />}
