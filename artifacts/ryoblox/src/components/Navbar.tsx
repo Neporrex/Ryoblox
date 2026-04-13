@@ -28,6 +28,9 @@ export default function Navbar() {
           <Link href="/tos" className={`nav-link${location === "/tos" ? " active" : ""}`}>
             Terms
           </Link>
+          <Link href="/dashboard" className={`nav-link${location === "/dashboard" ? " active" : ""}`}>
+            Dashboard
+          </Link>
           <a
             href="https://discord.com/oauth2/authorize"
             target="_blank"
