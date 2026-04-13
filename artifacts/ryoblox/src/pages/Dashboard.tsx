@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   getStats,
@@ -11,9 +10,23 @@ import {
   getPlayer,
 } from "@/lib/api";
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const API = "https://ryo-api.vercel.app";
+const OAUTH_URL =
+  "https://discord.com/oauth2/authorize?client_id=1492484301600718938&permissions=6761431819611478&response_type=code&redirect_uri=https%3A%2F%2Fryoblox.vercel.app%2Fdashboard&integration_type=1&scope=guilds+bot+guilds.members.read+identify+messages.read";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Period = "all" | "week" | "month" | "today";
+type Stage = "connect" | "loading" | "pick" | "dashboard";
+
+interface Guild {
+  id: string;
+  name: string;
+  icon: string | null;
+  owner: boolean;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -50,12 +63,12 @@ const card: React.CSSProperties = {
   padding: "1.5rem",
 };
 
-const label: React.CSSProperties = {
+const lbl: React.CSSProperties = {
   fontFamily: "'Manrope', sans-serif",
   fontSize: "0.68rem",
   fontWeight: 700,
   letterSpacing: "0.18em",
-  textTransform: "uppercase",
+  textTransform: "uppercase" as const,
   color: "#DC2626",
   marginBottom: "0.4rem",
 };
@@ -74,29 +87,57 @@ const muted: React.CSSProperties = {
   lineHeight: 1.7,
 };
 
-// ─── Period Selector ─────────────────────────────────────────────────────────
+const discordBtn: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "0.6rem",
+  fontFamily: "'Manrope', sans-serif",
+  fontSize: "0.9rem",
+  fontWeight: 700,
+  padding: "0.85rem 2rem",
+  background: "#5865F2",
+  borderRadius: "12px",
+  color: "#fff",
+  textDecoration: "none",
+  transition: "all 0.2s",
+  cursor: "pointer",
+  border: "none",
+};
+
+// ─── Discord Icon ─────────────────────────────────────────────────────────────
+
+function DiscordIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.054a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+    </svg>
+  );
+}
+
+// ─── Spinner ──────────────────────────────────────────────────────────────────
+
+function Spinner() {
+  return (
+    <>
+      <div style={{ width: "18px", height: "18px", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "#5865F2", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </>
+  );
+}
+
+// ─── Period Selector ──────────────────────────────────────────────────────────
 
 function PeriodSelector({ value, onChange }: { value: Period; onChange: (p: Period) => void }) {
   return (
     <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
       {(["all", "week", "month", "today"] as Period[]).map((p) => (
-        <button
-          key={p}
-          onClick={() => onChange(p)}
-          style={{
-            fontFamily: "'Manrope', sans-serif",
-            fontSize: "0.72rem",
-            fontWeight: 600,
-            letterSpacing: "0.06em",
-            padding: "0.3rem 0.75rem",
-            borderRadius: "6px",
-            border: value === p ? "1px solid #DC2626" : "1px solid rgba(255,255,255,0.08)",
-            background: value === p ? "rgba(220,38,38,0.12)" : "transparent",
-            color: value === p ? "#DC2626" : "#6B7280",
-            cursor: "pointer",
-            transition: "all 0.15s",
-          }}
-        >
+        <button key={p} onClick={() => onChange(p)} style={{
+          fontFamily: "'Manrope', sans-serif", fontSize: "0.72rem", fontWeight: 600,
+          letterSpacing: "0.06em", padding: "0.3rem 0.75rem", borderRadius: "6px",
+          border: value === p ? "1px solid #DC2626" : "1px solid rgba(255,255,255,0.08)",
+          background: value === p ? "rgba(220,38,38,0.12)" : "transparent",
+          color: value === p ? "#DC2626" : "#6B7280", cursor: "pointer", transition: "all 0.15s",
+        }}>
           {PERIOD_LABELS[p]}
         </button>
       ))}
@@ -106,10 +147,10 @@ function PeriodSelector({ value, onChange }: { value: Period; onChange: (p: Peri
 
 // ─── Stat Pill ────────────────────────────────────────────────────────────────
 
-function StatPill({ label: lbl, value }: { label: string; value: string | number }) {
+function StatPill({ label, value }: { label: string; value: string | number }) {
   return (
     <div style={{ ...card, flex: 1, minWidth: "120px" }}>
-      <p style={label}>{lbl}</p>
+      <p style={lbl}>{label}</p>
       <p style={{ ...heading, fontSize: "1.8rem" }}>{value}</p>
     </div>
   );
@@ -120,79 +161,46 @@ function StatPill({ label: lbl, value }: { label: string; value: string | number
 function MiniBarChart({ data }: { data: { label: string; value: number }[] }) {
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", height: "80px" }}>
+    <div style={{ display: "flex", alignItems: "flex-end", gap: "3px", height: "80px" }}>
       {data.map((d, i) => (
-        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%" }}>
-          <div
-            title={`${d.label}: ${d.value}`}
-            style={{
-              width: "100%",
-              height: `${(d.value / max) * 100}%`,
-              background: "rgba(220,38,38,0.7)",
-              borderRadius: "3px 3px 0 0",
-              transition: "height 0.3s ease",
-              minHeight: d.value > 0 ? "3px" : "0",
-            }}
-          />
+        <div key={i} style={{ flex: 1, height: "100%", display: "flex", alignItems: "flex-end" }}>
+          <div title={`${d.label}: ${d.value}`} style={{
+            width: "100%", height: `${(d.value / max) * 100}%`,
+            background: "rgba(220,38,38,0.7)", borderRadius: "3px 3px 0 0",
+            minHeight: d.value > 0 ? "3px" : "0",
+          }} />
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Heatmap Grid ─────────────────────────────────────────────────────────────
+// ─── Heatmap ──────────────────────────────────────────────────────────────────
 
 function HeatmapGrid({ grid }: { grid: number[][] }) {
-  // grid is [dow 0=Sun..6=Sat][hour]
   const DOW_ORDER = [1, 2, 3, 4, 5, 6, 0];
   const DOW_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const reordered = DOW_ORDER.map((d) => grid[d]);
   const max = Math.max(...reordered.flat(), 1);
-
   return (
     <div style={{ overflowX: "auto" }}>
       <div style={{ minWidth: "600px" }}>
-        {/* Hour labels */}
         <div style={{ display: "flex", marginLeft: "36px", marginBottom: "4px" }}>
           {Array.from({ length: 24 }, (_, h) => (
-            <div
-              key={h}
-              style={{
-                flex: 1,
-                textAlign: "center",
-                fontSize: "0.55rem",
-                color: "#4B5563",
-                fontFamily: "'Manrope', sans-serif",
-              }}
-            >
+            <div key={h} style={{ flex: 1, textAlign: "center", fontSize: "0.55rem", color: "#4B5563", fontFamily: "'Manrope', sans-serif" }}>
               {h % 3 === 0 ? fmtHour(h) : ""}
             </div>
           ))}
         </div>
         {reordered.map((row, di) => (
           <div key={di} style={{ display: "flex", alignItems: "center", marginBottom: "3px" }}>
-            <div style={{ width: "36px", fontSize: "0.65rem", color: "#6B7280", fontFamily: "'Manrope', sans-serif" }}>
-              {DOW_LABELS[di]}
-            </div>
-            {row.map((val, h) => {
-              const intensity = val / max;
-              return (
-                <div
-                  key={h}
-                  title={`${DOW_LABELS[di]} ${fmtHour(h)}: ${val} joins`}
-                  style={{
-                    flex: 1,
-                    height: "18px",
-                    borderRadius: "2px",
-                    marginRight: "2px",
-                    background: val === 0
-                      ? "rgba(255,255,255,0.03)"
-                      : `rgba(220,38,38,${0.1 + intensity * 0.9})`,
-                    transition: "background 0.2s",
-                  }}
-                />
-              );
-            })}
+            <div style={{ width: "36px", fontSize: "0.65rem", color: "#6B7280", fontFamily: "'Manrope', sans-serif" }}>{DOW_LABELS[di]}</div>
+            {row.map((val, h) => (
+              <div key={h} title={`${DOW_LABELS[di]} ${fmtHour(h)}: ${val} joins`} style={{
+                flex: 1, height: "18px", borderRadius: "2px", marginRight: "2px",
+                background: val === 0 ? "rgba(255,255,255,0.03)" : `rgba(220,38,38,${0.1 + (val / max) * 0.9})`,
+              }} />
+            ))}
           </div>
         ))}
       </div>
@@ -200,25 +208,20 @@ function HeatmapGrid({ grid }: { grid: number[][] }) {
   );
 }
 
-// ─── Traffic Sparkline ────────────────────────────────────────────────────────
+// ─── Traffic Chart ────────────────────────────────────────────────────────────
 
 function TrafficChart({ timestamps }: { timestamps: string[] }) {
   if (!timestamps.length) return <p style={muted}>No data.</p>;
-
-  // Bucket by hour
   const buckets: Record<string, number> = {};
   for (const ts of timestamps) {
     const d = new Date(ts);
-    const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}-${d.getUTCHours()}`;
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}-${d.getUTCHours()}`;
     buckets[key] = (buckets[key] || 0) + 1;
   }
-
-  const sorted = Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b));
-  const data = sorted.map(([k, v]) => {
-    const [y, mo, d, h] = k.split("-").map(Number);
+  const data = Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => {
+    const [, mo, d, h] = k.split("-").map(Number);
     return { label: `${d}/${mo + 1} ${fmtHour(h)}`, value: v };
   });
-
   return <MiniBarChart data={data.slice(-48)} />;
 }
 
@@ -227,176 +230,154 @@ function TrafficChart({ timestamps }: { timestamps: string[] }) {
 function PlayerSearch({ guildId }: { guildId: string }) {
   const [input, setInput] = useState("");
   const [search, setSearch] = useState("");
-
   const { data, isFetching, error } = useQuery({
     queryKey: ["player", guildId, search],
     queryFn: () => getPlayer(guildId, search),
     enabled: !!search,
   });
-
   return (
     <div style={card}>
-      <p style={label}>Player Search</p>
+      <p style={lbl}>Player Search</p>
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+        <input value={input} onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && setSearch(input.trim())}
           placeholder="Roblox username..."
-          style={{
-            flex: 1,
-            fontFamily: "'Manrope', sans-serif",
-            fontSize: "0.85rem",
-            padding: "0.5rem 0.85rem",
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "8px",
-            color: "#e5e5e5",
-            outline: "none",
-          }}
+          style={{ flex: 1, fontFamily: "'Manrope', sans-serif", fontSize: "0.85rem", padding: "0.5rem 0.85rem", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", color: "#e5e5e5", outline: "none" }}
         />
-        <button
-          onClick={() => setSearch(input.trim())}
-          style={{
-            fontFamily: "'Manrope', sans-serif",
-            fontSize: "0.75rem",
-            fontWeight: 700,
-            padding: "0.5rem 1rem",
-            background: "#DC2626",
-            border: "none",
-            borderRadius: "8px",
-            color: "#fff",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={() => setSearch(input.trim())} style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.75rem", fontWeight: 700, padding: "0.5rem 1rem", background: "#DC2626", border: "none", borderRadius: "8px", color: "#fff", cursor: "pointer" }}>
           Search
         </button>
       </div>
-
       {isFetching && <p style={muted}>Searching…</p>}
       {error && <p style={{ ...muted, color: "#EF4444" }}>Error fetching player.</p>}
       {data && !isFetching && (
-        <div>
-          {data.total_joins === 0 ? (
-            <p style={muted}>No data found for <strong style={{ color: "#e5e5e5" }}>{search}</strong>.</p>
-          ) : (
-            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+        data.total_joins === 0
+          ? <p style={muted}>No data found for <strong style={{ color: "#e5e5e5" }}>{search}</strong>.</p>
+          : <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
               <StatPill label="Total Joins" value={data.total_joins} />
               <StatPill label="Playtime" value={fmtSeconds(data.playtime_seconds)} />
             </div>
-          )}
+      )}
+    </div>
+  );
+}
+
+// ─── Connect Screen ───────────────────────────────────────────────────────────
+
+function ConnectScreen({ loading, error }: { loading?: boolean; error?: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "75vh", gap: "2rem", padding: "2rem", textAlign: "center" }}>
+      <div>
+        <p style={{ ...lbl, display: "block", textAlign: "center" }}>Analytics</p>
+        <h1 style={{ ...heading, fontSize: "clamp(2rem, 6vw, 3rem)", marginBottom: "0.75rem" }}>
+          Server Dashboard
+        </h1>
+        <p style={{ ...muted, maxWidth: "380px", margin: "0 auto" }}>
+          Sign in with Discord to view analytics for your Roblox game. Only servers with Ryoblox installed will appear.
+        </p>
+      </div>
+
+      {error && (
+        <div style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: "10px", padding: "0.75rem 1.25rem" }}>
+          <p style={{ ...muted, color: "#EF4444", margin: 0 }}>{error}</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <Spinner />
+          <span style={muted}>Signing you in…</span>
+        </div>
+      ) : (
+        <a href={OAUTH_URL} style={discordBtn}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "0.85"; (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-1px)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "1"; (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(0)"; }}
+        >
+          <DiscordIcon />
+          Connect with Discord
+        </a>
+      )}
+
+      <p style={{ ...muted, fontSize: "0.75rem", maxWidth: "320px" }}>
+        We only read your server list. No messages are accessed through OAuth.
+      </p>
+    </div>
+  );
+}
+
+// ─── Guild Picker ─────────────────────────────────────────────────────────────
+
+function GuildPicker({ guilds, onSelect }: { guilds: Guild[]; onSelect: (g: Guild) => void }) {
+  return (
+    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "7rem 1.5rem 5rem" }}>
+      <p style={lbl}>Your Servers</p>
+      <h1 style={{ ...heading, fontSize: "clamp(1.6rem, 4vw, 2.2rem)", marginBottom: "0.5rem" }}>
+        Select a Server
+      </h1>
+      <p style={{ ...muted, marginBottom: "2rem" }}>
+        Servers where Ryoblox is installed and has data.
+      </p>
+
+      {guilds.length === 0 ? (
+        <div style={{ ...card, textAlign: "center", padding: "3rem" }}>
+          <p style={{ ...muted, marginBottom: "1.25rem" }}>
+            No servers found with Ryoblox installed.
+          </p>
+          <a href="https://discord.com/oauth2/authorize?client_id=1492484301600718938&scope=bot&permissions=6761431819611478"
+            target="_blank" rel="noopener noreferrer" style={{ ...discordBtn, fontSize: "0.82rem", padding: "0.65rem 1.25rem" }}>
+            <DiscordIcon size={16} />
+            Add Ryoblox to a Server
+          </a>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+          {guilds.map((g) => (
+            <button key={g.id} onClick={() => onSelect(g)} style={{
+              display: "flex", alignItems: "center", gap: "1rem",
+              padding: "1rem 1.25rem",
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: "12px", cursor: "pointer",
+              transition: "all 0.15s", width: "100%", textAlign: "left",
+            }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(220,38,38,0.35)"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(220,38,38,0.04)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.02)"; }}
+            >
+              {g.icon ? (
+                <img src={g.icon} alt={g.name} style={{ width: "42px", height: "42px", borderRadius: "50%", objectFit: "cover" }} />
+              ) : (
+                <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "rgba(220,38,38,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ fontFamily: "'Clash Display', sans-serif", fontWeight: 700, color: "#DC2626", fontSize: "1rem" }}>{g.name.charAt(0)}</span>
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, color: "#e5e5e5", fontSize: "0.9rem", margin: 0 }}>{g.name}</p>
+                <p style={{ ...muted, fontSize: "0.72rem", margin: 0 }}>{g.owner ? "Owner" : "Member"}</p>
+              </div>
+              <svg width="16" height="16" fill="none" stroke="#4B5563" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-// ─── Entry Screen ─────────────────────────────────────────────────────────────
-
-function EntryScreen({ onEnter }: { onEnter: (guildId: string) => void }) {
-  const [input, setInput] = useState("");
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "70vh", gap: "2rem", padding: "2rem" }}>
-      <div style={{ textAlign: "center" }}>
-        <p style={{ ...label, textAlign: "center", display: "block" }}>Analytics</p>
-        <h1 style={{ ...heading, fontSize: "clamp(2rem, 6vw, 3rem)", marginBottom: "0.5rem" }}>
-          Server Dashboard
-        </h1>
-        <p style={{ ...muted, maxWidth: "400px" }}>
-          Connect with Discord to view your server's Roblox game analytics, or enter your Guild ID directly.
-        </p>
-      </div>
-
-      <a
-        href="https://discord.com/oauth2/authorize?client_id=1492484301600718938&permissions=6761431819611478&response_type=code&redirect_uri=https%3A%2F%2Fryoblox.vercel.app&integration_type=0&scope=guilds+bot+guilds.members.read+identify+messages.read"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "0.6rem",
-          fontFamily: "'Manrope', sans-serif",
-          fontSize: "0.9rem",
-          fontWeight: 700,
-          padding: "0.75rem 1.75rem",
-          background: "#5865F2",
-          borderRadius: "10px",
-          color: "#fff",
-          textDecoration: "none",
-          transition: "opacity 0.15s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.032.054a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
-        </svg>
-        Connect with Discord
-      </a>
-
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", width: "100%", maxWidth: "400px" }}>
-        <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.07)" }} />
-        <span style={{ ...muted, fontSize: "0.75rem" }}>or</span>
-        <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.07)" }} />
-      </div>
-
-      <div style={{ display: "flex", gap: "0.5rem", width: "100%", maxWidth: "400px" }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && input.trim() && onEnter(input.trim())}
-          placeholder="Enter Guild ID..."
-          style={{
-            flex: 1,
-            fontFamily: "'Manrope', sans-serif",
-            fontSize: "0.85rem",
-            padding: "0.65rem 1rem",
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "10px",
-            color: "#e5e5e5",
-            outline: "none",
-          }}
-        />
-        <button
-          onClick={() => input.trim() && onEnter(input.trim())}
-          style={{
-            fontFamily: "'Manrope', sans-serif",
-            fontSize: "0.8rem",
-            fontWeight: 700,
-            padding: "0.65rem 1.25rem",
-            background: "#DC2626",
-            border: "none",
-            borderRadius: "10px",
-            color: "#fff",
-            cursor: "pointer",
-          }}
-        >
-          View
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Dashboard Content ────────────────────────────────────────────────────────
 
-function DashboardContent({ guildId }: { guildId: string }) {
+function DashboardContent({ guildId, guildName, onBack }: { guildId: string; guildName: string; onBack: () => void }) {
   const [period, setPeriod] = useState<Period>("all");
 
-  const stats = useQuery({ queryKey: ["stats", guildId, period], queryFn: () => getStats(guildId, period) });
+  const stats       = useQuery({ queryKey: ["stats",       guildId, period], queryFn: () => getStats(guildId, period) });
   const leaderboard = useQuery({ queryKey: ["leaderboard", guildId, period], queryFn: () => getLeaderboard(guildId, period, 15) });
-  const today = useQuery({ queryKey: ["today", guildId], queryFn: () => getToday(guildId) });
-  const playtime = useQuery({ queryKey: ["playtime", guildId], queryFn: () => getPlaytime(guildId, 10) });
-  const revenue = useQuery({ queryKey: ["revenue", guildId, period], queryFn: () => getRevenue(guildId, period) });
-  const heatmap = useQuery({ queryKey: ["heatmap", guildId, period], queryFn: () => getHeatmap(guildId, period) });
+  const today       = useQuery({ queryKey: ["today",       guildId],         queryFn: () => getToday(guildId) });
+  const playtime    = useQuery({ queryKey: ["playtime",    guildId],         queryFn: () => getPlaytime(guildId, 10) });
+  const revenue     = useQuery({ queryKey: ["revenue",     guildId, period], queryFn: () => getRevenue(guildId, period) });
+  const heatmap     = useQuery({ queryKey: ["heatmap",     guildId, period], queryFn: () => getHeatmap(guildId, period) });
 
-  const sectionTitle = (title: string): React.CSSProperties => ({
-    ...heading,
-    fontSize: "1rem",
-    marginBottom: "1rem",
-    paddingLeft: "0.85rem",
-    borderLeft: "2px solid #DC2626",
-  });
+  const sTitle: React.CSSProperties = { ...heading, fontSize: "1rem", marginBottom: "1rem", paddingLeft: "0.85rem", borderLeft: "2px solid #DC2626" };
 
   return (
     <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "7rem 1.5rem 5rem" }}>
@@ -404,140 +385,109 @@ function DashboardContent({ guildId }: { guildId: string }) {
       {/* Header */}
       <div style={{ marginBottom: "2.5rem", display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
         <div>
-          <p style={label}>Dashboard</p>
-          <h1 style={{ ...heading, fontSize: "clamp(1.6rem, 4vw, 2.4rem)", marginBottom: "0.25rem" }}>
-            Server Analytics
-          </h1>
-          <p style={{ ...muted, fontSize: "0.78rem" }}>
-            Guild ID: <code style={{ color: "#4B5563", fontFamily: "monospace" }}>{guildId}</code>
-          </p>
+          <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.75rem", padding: 0 }}>
+            <svg width="14" height="14" fill="none" stroke="#6B7280" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></svg>
+            <span style={{ ...muted, fontSize: "0.78rem" }}>All servers</span>
+          </button>
+          <p style={lbl}>Dashboard</p>
+          <h1 style={{ ...heading, fontSize: "clamp(1.6rem, 4vw, 2.4rem)", marginBottom: "0.25rem" }}>{guildName}</h1>
         </div>
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
-      {/* Today's quick stats */}
+      {/* Stat pills */}
       <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "2rem" }}>
-        <StatPill label="Today's Joins" value={today.data?.total ?? "—"} />
-        <StatPill label="Unique Today" value={today.data?.unique ?? "—"} />
-        <StatPill label="Total Joins" value={stats.data?.total ?? "—"} />
+        <StatPill label="Today's Joins"  value={today.data?.total  ?? "—"} />
+        <StatPill label="Unique Today"   value={today.data?.unique ?? "—"} />
+        <StatPill label="Total Joins"    value={stats.data?.total  ?? "—"} />
         <StatPill label="Unique Players" value={stats.data?.unique ?? "—"} />
-        {revenue.data?.total_robux != null && (
+        {(revenue.data?.total_robux ?? 0) > 0 && (
           <StatPill label="Total Robux" value={`${revenue.data.total_robux.toLocaleString()} R$`} />
         )}
       </div>
 
       {/* Traffic + Leaderboard */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-
-        {/* Traffic Chart */}
         <div style={card}>
-          <h2 style={sectionTitle("Traffic")}>Traffic — {PERIOD_LABELS[period]}</h2>
-          {stats.isFetching
-            ? <p style={muted}>Loading…</p>
-            : <TrafficChart timestamps={stats.data?.timestamps ?? []} />
-          }
+          <h2 style={sTitle}>Traffic — {PERIOD_LABELS[period]}</h2>
+          {stats.isFetching ? <p style={muted}>Loading…</p> : <TrafficChart timestamps={stats.data?.timestamps ?? []} />}
         </div>
-
-        {/* Leaderboard */}
         <div style={card}>
-          <h2 style={sectionTitle("Leaderboard")}>Top Players — {PERIOD_LABELS[period]}</h2>
-          {leaderboard.isFetching
-            ? <p style={muted}>Loading…</p>
-            : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {(leaderboard.data?.leaderboard ?? []).slice(0, 10).map((p: any, i: number) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                      <span style={{ width: "20px", textAlign: "center", fontSize: "0.85rem" }}>
-                        {i < 3 ? MEDALS[i] : <span style={{ color: "#4B5563", fontFamily: "'Manrope', sans-serif", fontSize: "0.75rem" }}>{i + 1}</span>}
-                      </span>
-                      <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.85rem", color: "#d1d5db" }}>{p.username}</span>
-                    </div>
-                    <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.78rem", color: "#6B7280" }}>
-                      {p.joins} join{p.joins !== 1 ? "s" : ""}
+          <h2 style={sTitle}>Top Players — {PERIOD_LABELS[period]}</h2>
+          {leaderboard.isFetching ? <p style={muted}>Loading…</p> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              {(leaderboard.data?.leaderboard ?? []).slice(0, 10).map((p: any, i: number) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                    <span style={{ width: "20px", textAlign: "center", fontSize: "0.85rem" }}>
+                      {i < 3 ? MEDALS[i] : <span style={{ color: "#4B5563", fontFamily: "'Manrope', sans-serif", fontSize: "0.75rem" }}>{i + 1}</span>}
                     </span>
+                    <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.85rem", color: "#d1d5db" }}>{p.username}</span>
                   </div>
-                ))}
-                {!leaderboard.data?.leaderboard?.length && <p style={muted}>No data.</p>}
-              </div>
-            )
-          }
+                  <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.78rem", color: "#6B7280" }}>{p.joins} join{p.joins !== 1 ? "s" : ""}</span>
+                </div>
+              ))}
+              {!leaderboard.data?.leaderboard?.length && <p style={muted}>No data.</p>}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Today's Top + Playtime */}
+      {/* Today + Playtime */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-
-        {/* Today's Top 5 */}
         <div style={card}>
-          <h2 style={sectionTitle("Today")}>Today's Top Players</h2>
-          {today.isFetching
-            ? <p style={muted}>Loading…</p>
-            : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {(today.data?.top ?? []).map((p: any, i: number) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.85rem", color: "#d1d5db" }}>
-                      {i < 3 ? MEDALS[i] : `${i + 1}.`} {p.username}
-                    </span>
-                    <span style={{ ...muted, fontSize: "0.78rem" }}>{p.joins} joins</span>
-                  </div>
-                ))}
-                {!today.data?.top?.length && <p style={muted}>No joins today yet.</p>}
-              </div>
-            )
-          }
+          <h2 style={sTitle}>Today's Top Players</h2>
+          {today.isFetching ? <p style={muted}>Loading…</p> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              {(today.data?.top ?? []).map((p: any, i: number) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.85rem", color: "#d1d5db" }}>{i < 3 ? MEDALS[i] : `${i + 1}.`} {p.username}</span>
+                  <span style={{ ...muted, fontSize: "0.78rem" }}>{p.joins} joins</span>
+                </div>
+              ))}
+              {!today.data?.top?.length && <p style={muted}>No joins today yet.</p>}
+            </div>
+          )}
         </div>
-
-        {/* Playtime Leaderboard */}
         <div style={card}>
-          <h2 style={sectionTitle("Playtime")}>⏱ Playtime Top 10</h2>
-          {playtime.isFetching
-            ? <p style={muted}>Loading…</p>
-            : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {(playtime.data?.leaderboard ?? []).map((p: any, i: number) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.85rem", color: "#d1d5db" }}>
-                      {i < 3 ? MEDALS[i] : `${i + 1}.`} {p.username}
-                    </span>
-                    <span style={{ ...muted, fontSize: "0.78rem" }}>{fmtSeconds(p.seconds)}</span>
-                  </div>
-                ))}
-                {!playtime.data?.leaderboard?.length && <p style={muted}>No playtime data.</p>}
-              </div>
-            )
-          }
+          <h2 style={sTitle}>⏱ Playtime Top 10</h2>
+          {playtime.isFetching ? <p style={muted}>Loading…</p> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              {(playtime.data?.leaderboard ?? []).map((p: any, i: number) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.85rem", color: "#d1d5db" }}>{i < 3 ? MEDALS[i] : `${i + 1}.`} {p.username}</span>
+                  <span style={{ ...muted, fontSize: "0.78rem" }}>{fmtSeconds(p.seconds)}</span>
+                </div>
+              ))}
+              {!playtime.data?.leaderboard?.length && <p style={muted}>No playtime data.</p>}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Revenue */}
       {(revenue.data?.count ?? 0) > 0 && (
         <div style={{ ...card, marginBottom: "1rem" }}>
-          <h2 style={sectionTitle("Revenue")}>💰 Revenue — {PERIOD_LABELS[period]}</h2>
+          <h2 style={sTitle}>💰 Revenue — {PERIOD_LABELS[period]}</h2>
           <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
             <StatPill label="Total Robux" value={`${revenue.data.total_robux.toLocaleString()} R$`} />
             <StatPill label="Transactions" value={revenue.data.count} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
-              <p style={{ ...label, marginBottom: "0.6rem" }}>Top Buyers</p>
+              <p style={{ ...lbl, marginBottom: "0.6rem" }}>Top Buyers</p>
               {revenue.data.top_buyers.map((b: any, i: number) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem" }}>
-                  <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.82rem", color: "#d1d5db" }}>
-                    {i < 3 ? MEDALS[i] : `${i + 1}.`} {b.username}
-                  </span>
+                  <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.82rem", color: "#d1d5db" }}>{i < 3 ? MEDALS[i] : `${i + 1}.`} {b.username}</span>
                   <span style={muted}>{b.robux.toLocaleString()} R$</span>
                 </div>
               ))}
             </div>
             <div>
-              <p style={{ ...label, marginBottom: "0.6rem" }}>Top Items</p>
+              <p style={{ ...lbl, marginBottom: "0.6rem" }}>Top Items</p>
               {revenue.data.top_items.map((it: any, i: number) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem" }}>
-                  <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.82rem", color: "#d1d5db" }}>
-                    {i < 3 ? MEDALS[i] : `${i + 1}.`} {it.item}
-                  </span>
+                  <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: "0.82rem", color: "#d1d5db" }}>{i < 3 ? MEDALS[i] : `${i + 1}.`} {it.item}</span>
                   <span style={muted}>{it.robux.toLocaleString()} R$</span>
                 </div>
               ))}
@@ -548,13 +498,10 @@ function DashboardContent({ guildId }: { guildId: string }) {
 
       {/* Heatmap */}
       <div style={{ ...card, marginBottom: "1rem" }}>
-        <h2 style={sectionTitle("Heatmap")}>Activity Heatmap — {PERIOD_LABELS[period]}</h2>
-        {heatmap.isFetching
-          ? <p style={muted}>Loading…</p>
-          : heatmap.data?.grid
-            ? <HeatmapGrid grid={heatmap.data.grid} />
-            : <p style={muted}>No data.</p>
-        }
+        <h2 style={sTitle}>Activity Heatmap — {PERIOD_LABELS[period]}</h2>
+        {heatmap.isFetching ? <p style={muted}>Loading…</p>
+          : heatmap.data?.grid ? <HeatmapGrid grid={heatmap.data.grid} />
+          : <p style={muted}>No data.</p>}
       </div>
 
       {/* Player Search */}
@@ -563,18 +510,58 @@ function DashboardContent({ guildId }: { guildId: string }) {
   );
 }
 
-// ─── Main Export ──────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [guildId, setGuildId] = useState<string | null>(null);
+  const [stage, setStage]         = useState<Stage>("connect");
+  const [token, setToken]         = useState<string | null>(null);
+  const [guilds, setGuilds]       = useState<Guild[]>([]);
+  const [selectedGuild, setSelectedGuild] = useState<Guild | null>(null);
+  const [error, setError]         = useState<string | null>(null);
 
-  if (!guildId) {
-    return <div className="page-content"><EntryScreen onEnter={setGuildId} /></div>;
-  }
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) return;
+
+    window.history.replaceState({}, "", window.location.pathname);
+    setStage("loading");
+    setError(null);
+
+    fetch(`${API}/api/auth/callback?code=${encodeURIComponent(code)}`)
+      .then((r) => r.json())
+      .then(async (data) => {
+        if (data.error) throw new Error(data.error);
+        const accessToken: string = data.access_token;
+        setToken(accessToken);
+
+        const guildsRes = await fetch(`${API}/api/guilds`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const guildsData = await guildsRes.json();
+        if (guildsData.error) throw new Error(guildsData.error);
+
+        setGuilds(guildsData.guilds);
+        setStage("pick");
+      })
+      .catch((err) => {
+        setError(err.message || "Authentication failed. Please try again.");
+        setStage("connect");
+      });
+  }, []);
 
   return (
     <div className="page-content">
-      <DashboardContent guildId={guildId} />
+      {stage === "connect"   && <ConnectScreen error={error ?? undefined} />}
+      {stage === "loading"   && <ConnectScreen loading />}
+      {stage === "pick"      && <GuildPicker guilds={guilds} onSelect={(g) => { setSelectedGuild(g); setStage("dashboard"); }} />}
+      {stage === "dashboard" && selectedGuild && (
+        <DashboardContent
+          guildId={selectedGuild.id}
+          guildName={selectedGuild.name}
+          onBack={() => setStage("pick")}
+        />
+      )}
     </div>
   );
 }
