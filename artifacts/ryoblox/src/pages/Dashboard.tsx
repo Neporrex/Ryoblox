@@ -15,7 +15,7 @@ import {
 const API = "https://ryo-api.vercel.app";
 const DISCORD_CLIENT_ID = "1492484301600718938";
 const REDIRECT_URI = "https://ryoblox.vercel.app/dashboard";
-const OAUTH_URL = `https://discord.com/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=identify%20guilds`;
+const OAUTH_URL = `https://discord.com/oauth2/authorize?client_id=1492484301600718938&response_type=code&redirect_uri=https%3A%2F%2Fryoblox.vercel.app%2Fdashboard&scope=guilds+guilds.members.read+identify+messages.read`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
